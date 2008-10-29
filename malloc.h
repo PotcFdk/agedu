@@ -40,6 +40,8 @@ char *dupstr(const char *s);
  *    printf)
  *  - %s takes a const char * and formats it like normal %s
  *    (again, no fine-tuning available)
+ *  - %h takes a const char * but escapes it so that it's safe for
+ *    HTML
  *  - %S takes an int followed by a const char *. If the int is
  *    zero, it behaves just like %s. If the int is nonzero, it
  *    transforms the string by stuffing a \r before every \n.

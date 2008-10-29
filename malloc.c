@@ -69,7 +69,7 @@ char *dupfmt(const char *fmt, ...)
 
 	while (*p) {
 	    const char *data = NULL;
-	    int datalen = 0, stuffcr = 0;
+	    int datalen = 0, stuffcr = 0, htmlesc = 0;
 
 	    if (*p == '%') {
 		p++;
@@ -93,6 +93,10 @@ char *dupfmt(const char *fmt, ...)
 		} else if (*p == 's') {
 		    data = va_arg(ap, const char *);
 		    datalen = strlen(data);
+		} else if (*p == 'h') {
+		    htmlesc = 1;
+		    data = va_arg(ap, const char *);
+		    datalen = strlen(data);
 		} else if (assert(*p == 'S'), 1) {
 		    stuffcr = va_arg(ap, int);
 		    data = va_arg(ap, const char *);
@@ -106,20 +110,30 @@ char *dupfmt(const char *fmt, ...)
 	    }
 
 	    if (pass == 0) {
-		totallen += datalen;
-		if (stuffcr) {
-		    while (datalen > 0) {
-			if (*data == '\n')
-			    totallen++;
-			data++, datalen--;
-		    }
+		while (datalen > 0) {
+		    totallen++;
+		    if (stuffcr && *data == '\n')
+			totallen++;
+		    if (htmlesc &&
+			(*data == '<' || *data == '>' || *data == '&'))
+			totallen += 4; /* max(len("gt;"),len("amp;")) */
+		    data++, datalen--;
 		}
 	    } else {
 		while (datalen > 0) {
-		    if (stuffcr && *data == '\n')
-			*rp++ = '\r';
-		    *rp++ = *data++;
-		    datalen--;
+		    if (htmlesc && (*data < 32 || *data >= 127))
+			*rp++ = '?';   /* *shrug* */
+		    else if (htmlesc && *data == '<')
+			rp += sprintf(rp, "&lt;");
+		    else if (htmlesc && *data == '>')
+			rp += sprintf(rp, "&gt;");
+		    else if (htmlesc && *data == '&')
+			rp += sprintf(rp, "&amp;");
+		    else if (stuffcr && *data == '\n')
+			*rp++ = '\r', *rp++ = '\n';
+		    else
+			*rp++ = *data;
+		    data++, datalen--;
 		}
 	    }
 	}

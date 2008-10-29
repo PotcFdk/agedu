@@ -1,0 +1,104 @@
+TODO list for agedu
+===================
+
+Before it's non-embarrassingly releasable:
+
+ - render HTTP access control more sane.
+    * we should have the configurable option to use HTTP Basic
+      authentication or Linux magic /proc/net/tcp
+    * a third option, and the default one, should be to _try_ to use
+      magic auth, and fall back to HTTP Basic if unavailable
+
+ - sort out the command line syntax
+    * I think there should be a unified --mode / -M for every
+      running mode, possibly without the one-letter option for the
+      diagnostic sorts of things
+    * there should be some configurable options: 
+       + range limits on the age display
+       + server address in httpd mode
+
+ - do some configurability for the disk scan
+    * wildcard-based includes and excludes
+       + wildcards can act on the last pathname component or the
+	 whole lot
+       + include and exclude can be interleaved; implicit "include
+	 *" before any
+    * reinstate filesystem crossing, though not doing so should
+      remain the default
+
+ - polish up disk-scan progress reporting
+    * by default it should be conditional on isatty(2)
+    * manual override to enable or disable
+    * we should find rather than guessing the terminal width
+
+ - work out what to do about atimes on directories
+    * one option is to read them during the scan and reinstate them
+      after each recursion pop. Race-condition prone.
+    * marking them in a distinctive colour in the reports is the
+      other option.
+
+ - make a final decision on the name!
+
+Future directions:
+
+ - run-time configuration in the HTTP server
+    * I think this probably works by having a configuration form, or
+      a link pointing to one, somewhere on the report page. If you
+      want to reconfigure anything, you fill in and submit the form;
+      the web server receives HTTP GET with parameters and a
+      referer, adjusts its internal configuration, and returns an
+      HTTP redirect back to the referring page - which it then
+      re-renders in accordance with the change.
+    * All the same options should have their starting states
+      configurable on the command line too.
+
+ - polish the plain-text output:
+    + do the same formatting as in HTML, by showing files as a
+      single unit and also sorting by size? (Probably the other way
+      up, due to scrolling.)
+    + configurable recursive output depth
+
+ - curses-ish equivalent of the web output
+    + try using xterm 256-colour mode. Can (n)curses handle that? If
+      not, try doing it manually.
+
+ - cross-module:
+    + figure out what to do about scans starting in the root
+      directory!
+       * Currently we end up with a double leading slash on the
+	 pathnames, which is ugly, and we also get a zero-length
+	 href in between those slashes which means the web interface
+	 doesn't let you click back up to the top level at all.
+       * One big problem here is that a lot of the code assumes that
+	 you can find the extent of a pathname by searching for
+	 "foo" and "foo^A", trusting that anything inside the
+	 directory will begin "foo/". So I'd need to consistently
+	 fix this everywhere so that a trailing slash is disregarded
+	 while doing it, but not actually removed.
+       * The text output gets it all wrong.
+       * The HTML output is fiddly even at the design stage: where
+	 would I _ideally_ put the link to click on to get back to
+	 /? It's unclear!
+
+ - more flexible running modes
+    + decouple the disk scan from the index building code, so that
+      the former can optionally output in the same format as --dump
+      and the latter can optionally work from input on stdin (having
+      also fixed the --dump format in the process so it's perfectly
+      general). Then we could scan on one machine and transfer the
+      results over the net to another machine where they'd be
+      indexed; in particular, this way the indexing machine could be
+      64-bit even if the machine owning the filesystems was only 32.
+    + ability to build a database _and_ immediately run one of the
+      ongoing interactive report modes (httpd, curses) would seem
+      handy.
+
+ - portability
+    + between Unices:
+       * autoconf?
+       * configure use of stat64
+       * configure use of /proc/net/tcp
+       * what do we do elsewhere about _GNU_SOURCE?
+    + further afield: is there in fact any non-Unix OS that supports
+      atimes and hence can be used with agedu at all?
+       * yes! http://msdn.microsoft.com/en-us/library/ms724290.aspx

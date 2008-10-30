@@ -23,11 +23,6 @@ Before it's non-embarrassingly releasable:
     * reinstate filesystem crossing, though not doing so should
       remain the default
 
- - polish up disk-scan progress reporting
-    * by default it should be conditional on isatty(2)
-    * manual override to enable or disable
-    * we should find rather than guessing the terminal width
-
  - work out what to do about atimes on directories
     * one option is to read them during the scan and reinstate them
       after each recursion pop. Race-condition prone.
@@ -86,16 +81,23 @@ Future directions:
       results over the net to another machine where they'd be
       indexed; in particular, this way the indexing machine could be
       64-bit even if the machine owning the filesystems was only 32.
-    + ability to build a database _and_ immediately run one of the
-      ongoing interactive report modes (httpd, curses) would seem
-      handy.
+    + in the other direction, ability to build a database _and_
+      immediately run one of the ongoing interactive report modes
+      (httpd, curses) in a single invocation would seem handy.
 
  - portability
     + between Unices:
        * autoconf?
        * configure use of stat64
        * configure use of /proc/net/tcp
+       * configure use of /dev/random
+       * configure use of Linux syscall magic replacing readdir
        * what do we do elsewhere about _GNU_SOURCE?
-    + further afield: is there in fact any non-Unix OS that supports
-      atimes and hence can be used with agedu at all?
-       * yes! http://msdn.microsoft.com/en-us/library/ms724290.aspx
+    + http://msdn.microsoft.com/en-us/library/ms724290.aspx suggest
+      modern Windowses support atime-equivalents, so a Windows port
+      is possible in principle. Would need to modify the current
+      structure a lot, to abstract away (at least) memory-mapping of
+      files, details of disk scan procedure, networking for httpd,
+      the path separator character (yuck). Unclear what the right UI
+      would be on Windows, too; command-line exactly as now might be
+      considered just a _little_ unfriendly. Or perhaps not.

@@ -15,6 +15,8 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <termios.h>
+#include <sys/ioctl.h>
 
 #include "du.h"
 #include "trie.h"
@@ -41,6 +43,7 @@ struct ctx {
     dev_t datafile_dev, filesystem_dev;
     ino_t datafile_ino;
     time_t last_output_update;
+    int progress, progwidth;
 };
 
 static int gotdata(void *vctx, const char *pathname, const struct stat64 *st)
@@ -73,8 +76,11 @@ static int gotdata(void *vctx, const char *pathname, const struct stat64 *st)
 
     t = time(NULL);
     if (t != ctx->last_output_update) {
-	fprintf(stderr, "%-79.79s\r", pathname);
-	fflush(stderr);
+	if (ctx->progress) {
+	    fprintf(stderr, "%-*.*s\r", ctx->progwidth, ctx->progwidth,
+		    pathname);
+	    fflush(stderr);
+	}
 	ctx->last_output_update = t;
     }
 
@@ -141,6 +147,7 @@ int main(int argc, char **argv)
     enum { QUERY, HTML, SCAN, DUMP, HTTPD } mode = QUERY;
     char *minage = "0d";
     int auth = HTTPD_AUTH_MAGIC | HTTPD_AUTH_BASIC;
+    int progress = 1;
 
     while (--argc > 0) {
         char *p = *++argv;
@@ -172,6 +179,17 @@ int main(int argc, char **argv)
 		} else if (!strcmp(p, "--httpd") ||
 			   !strcmp(p, "--server")) {
 		    mode = HTTPD;
+		} else if (!strcmp(p, "--progress") ||
+			   !strcmp(p, "--scan-progress")) {
+		    progress = 2;
+		} else if (!strcmp(p, "--no-progress") ||
+			   !strcmp(p, "--no-scan-progress")) {
+		    progress = 0;
+		} else if (!strcmp(p, "--tty-progress") ||
+			   !strcmp(p, "--tty-scan-progress") ||
+			   !strcmp(p, "--progress-tty") ||
+			   !strcmp(p, "--scan-progress-tty")) {
+		    progress = 1;
 		} else if (!strcmp(p, "--file") ||
 			   !strcmp(p, "--auth") ||
 			   !strcmp(p, "--http-auth") ||
@@ -299,6 +317,18 @@ int main(int argc, char **argv)
 
 	ctx->last_output_update = time(NULL);
 
+	/* progress==1 means report progress only if stderr is a tty */
+	if (progress == 1)
+	    progress = isatty(2) ? 2 : 0;
+	ctx->progress = progress;
+	{
+	    struct winsize ws;
+	    if (progress && ioctl(2, TIOCGWINSZ, &ws) == 0)
+		ctx->progwidth = ws.ws_col - 1;
+	    else
+		ctx->progwidth = 79;
+	}
+
 	/*
 	 * Scan the directory tree, and write out the trie component
 	 * of the data file.
@@ -308,8 +338,10 @@ int main(int argc, char **argv)
 	count = triebuild_finish(ctx->tb);
 	triebuild_free(ctx->tb);
 
-	fprintf(stderr, "%-79s\r", "");
-	fflush(stderr);
+	if (ctx->progress) {
+	    fprintf(stderr, "%-*s\r", ctx->progwidth, "");
+	    fflush(stderr);
+	}
 
 	/*
 	 * Work out how much space the cumulative index trees will

@@ -140,6 +140,7 @@ int main(int argc, char **argv)
     int doing_opts = 1;
     enum { QUERY, HTML, SCAN, DUMP, HTTPD } mode = QUERY;
     char *minage = "0d";
+    int auth = HTTPD_AUTH_MAGIC | HTTPD_AUTH_BASIC;
 
     while (--argc > 0) {
         char *p = *++argv;
@@ -172,6 +173,10 @@ int main(int argc, char **argv)
 			   !strcmp(p, "--server")) {
 		    mode = HTTPD;
 		} else if (!strcmp(p, "--file") ||
+			   !strcmp(p, "--auth") ||
+			   !strcmp(p, "--http-auth") ||
+			   !strcmp(p, "--httpd-auth") ||
+			   !strcmp(p, "--server-auth") ||
 			   !strcmp(p, "--minimum-age") ||
 			   !strcmp(p, "--min-age") ||
 			   !strcmp(p, "--age")) {
@@ -193,6 +198,25 @@ int main(int argc, char **argv)
 			       !strcmp(p, "--min-age") ||
 			       !strcmp(p, "--age")) {
 			minage = optval;
+		    } else if (!strcmp(p, "--auth") ||
+			       !strcmp(p, "--http-auth") ||
+			       !strcmp(p, "--httpd-auth") ||
+			       !strcmp(p, "--server-auth")) {
+			if (!strcmp(optval, "magic"))
+			    auth = HTTPD_AUTH_MAGIC;
+			else if (!strcmp(optval, "basic"))
+			    auth = HTTPD_AUTH_BASIC;
+			else if (!strcmp(optval, "none"))
+			    auth = HTTPD_AUTH_NONE;
+			else if (!strcmp(optval, "default"))
+			    auth = HTTPD_AUTH_MAGIC | HTTPD_AUTH_BASIC;
+			else {
+			    fprintf(stderr, "%s: unrecognised authentication"
+				    " type '%s'\n%*s  options are 'magic',"
+				    " 'basic', 'none', 'default'\n",
+				    PNAME, optval, (int)strlen(PNAME), "");
+			    return 1;
+			}
 		    }
 		} else {
 		    fprintf(stderr, "%s: unrecognised option '%s'\n",
@@ -471,7 +495,7 @@ int main(int argc, char **argv)
 	    return 1;
 	}
 
-	run_httpd(mappedfile);
+	run_httpd(mappedfile, auth);
     }
 
     return 0;

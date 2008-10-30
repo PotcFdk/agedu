@@ -3,12 +3,6 @@ TODO list for agedu
 
 Before it's non-embarrassingly releasable:
 
- - render HTTP access control more sane.
-    * we should have the configurable option to use HTTP Basic
-      authentication or Linux magic /proc/net/tcp
-    * a third option, and the default one, should be to _try_ to use
-      magic auth, and fall back to HTTP Basic if unavailable
-
  - sort out the command line syntax
     * I think there should be a unified --mode / -M for every
       running mode, possibly without the one-letter option for the
@@ -16,6 +10,9 @@ Before it's non-embarrassingly releasable:
     * there should be some configurable options: 
        + range limits on the age display
        + server address in httpd mode
+       + HTTP authentication: specify username and/or password, the
+	 latter by at least some means which doesn't involve it
+	 showing up in "ps"
 
  - do some configurability for the disk scan
     * wildcard-based includes and excludes

@@ -17,6 +17,7 @@
 #include <sys/mman.h>
 #include <termios.h>
 #include <sys/ioctl.h>
+#include <fnmatch.h>
 
 #include "du.h"
 #include "trie.h"
@@ -38,12 +39,21 @@ void fatal(const char *fmt, ...)
     exit(1);
 }
 
+struct inclusion_exclusion {
+    int include;
+    const char *wildcard;
+    int path;
+};
+
 struct ctx {
     triebuild *tb;
     dev_t datafile_dev, filesystem_dev;
     ino_t datafile_ino;
     time_t last_output_update;
     int progress, progwidth;
+    struct inclusion_exclusion *inex;
+    int ninex;
+    int crossfs;
 };
 
 static int gotdata(void *vctx, const char *pathname, const struct stat64 *st)
@@ -51,6 +61,8 @@ static int gotdata(void *vctx, const char *pathname, const struct stat64 *st)
     struct ctx *ctx = (struct ctx *)vctx;
     struct trie_file file;
     time_t t;
+    int i, include;
+    const char *filename;
 
     /*
      * Filter out our own data file.
@@ -60,15 +72,27 @@ static int gotdata(void *vctx, const char *pathname, const struct stat64 *st)
 
     /*
      * Don't cross the streams^W^Wany file system boundary.
-     * (FIXME: this should be a configurable option.)
      */
-    if (st->st_dev != ctx->filesystem_dev)
+    if (!ctx->crossfs && st->st_dev != ctx->filesystem_dev)
 	return 0;
 
     /*
-     * FIXME: other filtering in gotdata will be needed, when we
-     * implement serious filtering.
+     * Filter based on wildcards.
      */
+    include = 1;
+    filename = strrchr(pathname, '/');
+    if (!filename)
+	filename = pathname;
+    else
+	filename++;
+    for (i = 0; i < ctx->ninex; i++) {
+	if (fnmatch(ctx->inex[i].wildcard,
+		    ctx->inex[i].path ? pathname : filename,
+		    FNM_PATHNAME) == 0)
+	    include = ctx->inex[i].include;
+    }
+    if (!include)
+	return 1;		       /* filter, but don't prune */
 
     file.blocks = st->st_blocks;
     file.atime = st->st_atime;
@@ -148,6 +172,9 @@ int main(int argc, char **argv)
     char *minage = "0d";
     int auth = HTTPD_AUTH_MAGIC | HTTPD_AUTH_BASIC;
     int progress = 1;
+    struct inclusion_exclusion *inex = NULL;
+    int ninex = 0, inexsize = 0;
+    int crossfs = 0;
 
     while (--argc > 0) {
         char *p = *++argv;
@@ -190,6 +217,10 @@ int main(int argc, char **argv)
 			   !strcmp(p, "--progress-tty") ||
 			   !strcmp(p, "--scan-progress-tty")) {
 		    progress = 1;
+		} else if (!strcmp(p, "--crossfs")) {
+		    crossfs = 1;
+		} else if (!strcmp(p, "--no-crossfs")) {
+		    crossfs = 0;
 		} else if (!strcmp(p, "--file") ||
 			   !strcmp(p, "--auth") ||
 			   !strcmp(p, "--http-auth") ||
@@ -197,7 +228,11 @@ int main(int argc, char **argv)
 			   !strcmp(p, "--server-auth") ||
 			   !strcmp(p, "--minimum-age") ||
 			   !strcmp(p, "--min-age") ||
-			   !strcmp(p, "--age")) {
+			   !strcmp(p, "--age") ||
+			   !strcmp(p, "--include") ||
+			   !strcmp(p, "--include-path") ||
+			   !strcmp(p, "--exclude") ||
+			   !strcmp(p, "--exclude-path")) {
 		    /*
 		     * Long options requiring values.
 		     */
@@ -235,6 +270,21 @@ int main(int argc, char **argv)
 				    PNAME, optval, (int)strlen(PNAME), "");
 			    return 1;
 			}
+		    } else if (!strcmp(p, "--include") ||
+			       !strcmp(p, "--include-path") ||
+			       !strcmp(p, "--exclude") ||
+			       !strcmp(p, "--exclude-path")) {
+			if (ninex >= inexsize) {
+			    inexsize = ninex * 3 / 2 + 16;
+			    inex = sresize(inex, inexsize,
+					   struct inclusion_exclusion);
+			}
+			inex[ninex].path = (!strcmp(p, "--include-path") ||
+					    !strcmp(p, "--exclude-path"));
+			inex[ninex].include = (!strcmp(p, "--include") ||
+					       !strcmp(p, "--include-path"));
+			inex[ninex].wildcard = optval;
+			ninex++;
 		    }
 		} else {
 		    fprintf(stderr, "%s: unrecognised option '%s'\n",
@@ -306,7 +356,7 @@ int main(int argc, char **argv)
 		    strerror(errno));
 	    return 1;
 	}
-	ctx->filesystem_dev = st.st_dev;
+	ctx->filesystem_dev = crossfs ? 0 : st.st_dev;
 
 	if (fstat(fd, &st) < 0) {
 	    perror("agedu: fstat");
@@ -314,6 +364,9 @@ int main(int argc, char **argv)
 	}
 	ctx->datafile_dev = st.st_dev;
 	ctx->datafile_ino = st.st_ino;
+	ctx->inex = inex;
+	ctx->ninex = ninex;
+	ctx->crossfs = crossfs;
 
 	ctx->last_output_update = time(NULL);
 

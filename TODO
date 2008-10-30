@@ -14,22 +14,23 @@ Before it's non-embarrassingly releasable:
 	 latter by at least some means which doesn't involve it
 	 showing up in "ps"
 
- - do some configurability for the disk scan
-    * wildcard-based includes and excludes
-       + wildcards can act on the last pathname component or the
-	 whole lot
-       + include and exclude can be interleaved; implicit "include
-	 *" before any
-    * reinstate filesystem crossing, though not doing so should
-      remain the default
-
- - work out what to do about atimes on directories
+ - work out what to do about atimes on directories in the absence of
+   the Linux syscall magic
     * one option is to read them during the scan and reinstate them
       after each recursion pop. Race-condition prone.
-    * marking them in a distinctive colour in the reports is the
-      other option.
+    * marking them in a distinctive colour in the reports is another
+      option.
+    * a third option is simply to ignore space taken up by
+      directories in the first place; inaccurate but terribly simple.
+    * incidentally, sometimes open(...,O_NOATIME) will fail, and
+      then we have to fall back to ordinary open. Be prepared to do
+      this, which probably means getting rid of the icky macro
+      hackery in du.c and turning it into a more sensible run-time
+      abstraction layer.
 
  - make a final decision on the name!
+
+ - man page, licence, online help.
 
 Future directions:
 
@@ -92,6 +93,8 @@ Future directions:
        * configure use of /proc/net/tcp
        * configure use of /dev/random
        * configure use of Linux syscall magic replacing readdir
+          + later glibcs have fdopendir, hooray! So we can use that
+	    too, if it's available and O_NOATIME is too.
        * what do we do elsewhere about _GNU_SOURCE?
     + http://msdn.microsoft.com/en-us/library/ms724290.aspx suggest
       modern Windowses support atime-equivalents, so a Windows port

@@ -111,8 +111,8 @@ static int gotdata(void *vctx, const char *pathname, const struct stat64 *st)
     return 1;
 }
 
-static void run_query(const void *mappedfile, const char *rootdir,
-		      time_t t, int depth)
+static void text_query(const void *mappedfile, const char *rootdir,
+		       time_t t, int depth)
 {
     size_t maxpathlen;
     char *pathbuf;
@@ -148,7 +148,7 @@ static void run_query(const void *mappedfile, const char *rootdir,
 	xi1++;
 	while (xi1 < xi2) {
 	    trie_getpath(mappedfile, xi1, pathbuf);
-	    run_query(mappedfile, pathbuf, t, depth-1);
+	    text_query(mappedfile, pathbuf, t, depth-1);
 	    strcat(pathbuf, "\001");
 	    xi1 = trie_before(mappedfile, pathbuf);
 	}
@@ -168,7 +168,7 @@ int main(int argc, char **argv)
     char *filename = "agedu.dat";
     char *rootdir = NULL;
     int doing_opts = 1;
-    enum { QUERY, HTML, SCAN, DUMP, HTTPD } mode = QUERY;
+    enum { USAGE, TEXT, HTML, SCAN, DUMP, HTTPD } mode = USAGE;
     char *minage = "0d";
     int auth = HTTPD_AUTH_MAGIC | HTTPD_AUTH_BASIC;
     int progress = 1;
@@ -201,6 +201,8 @@ int main(int argc, char **argv)
 		    mode = SCAN;
 		} else if (!strcmp(p, "--dump")) {
 		    mode = DUMP;
+		} else if (!strcmp(p, "--text")) {
+		    mode = TEXT;
 		} else if (!strcmp(p, "--html")) {
 		    mode = HTML;
 		} else if (!strcmp(p, "--httpd") ||
@@ -342,7 +344,10 @@ int main(int argc, char **argv)
     if (!rootdir)
 	rootdir = ".";
 
-    if (mode == SCAN) {
+    if (mode == USAGE) {
+	printf("FIXME: usage();\n");
+	return 0;
+    } else if (mode == SCAN) {
 
 	fd = open(filename, O_RDWR | O_TRUNC | O_CREAT, S_IRWXU);
 	if (fd < 0) {
@@ -440,7 +445,7 @@ int main(int argc, char **argv)
 	ftruncate(fd, realsize);
 	close(fd);
 	printf("Actual index file size = %ju bytes\n", (intmax_t)realsize);
-    } else if (mode == QUERY) {
+    } else if (mode == TEXT) {
 	time_t t;
 	struct tm tm;
 	int nunits;
@@ -500,7 +505,7 @@ int main(int argc, char **argv)
 	if (pathlen > 0 && rootdir[pathlen-1] == '/')
 	    rootdir[--pathlen] = '\0';
 
-	run_query(mappedfile, rootdir, t, 1);
+	text_query(mappedfile, rootdir, t, 1);
     } else if (mode == HTML) {
 	size_t pathlen;
 	unsigned long xi;

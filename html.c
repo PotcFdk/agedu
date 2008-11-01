@@ -20,6 +20,8 @@
 
 #define MAXCOLOUR 511
 
+extern char pathsep;
+
 struct html {
     char *buf;
     size_t buflen, bufsize;
@@ -442,7 +444,7 @@ char *html_query(const void *t, unsigned long index,
      */
     htprintf(ctx, "<p align=center>\n<code>");
     q = path;
-    for (p = strchr(path, '/'); p; p = strchr(p+1, '/')) {
+    for (p = strchr(path, pathsep); p; p = strchr(p+1, pathsep)) {
 	int doing_href = 0;
 	/*
 	 * See if this path prefix exists in the trie. If so,
@@ -456,12 +458,12 @@ char *html_query(const void *t, unsigned long index,
 	    htprintf(ctx, "<a href=\"%s\">", href);
 	    doing_href = 1;
 	}
-	*p = '/';
+	*p = pathsep;
 	htescape(ctx, q, p - q, 1);
 	q = p + 1;
 	if (doing_href)
 	    htprintf(ctx, "</a>");
-	htprintf(ctx, "/");
+	htescape(ctx, q, p - q, 1);
     }
     htescape(ctx, q, strlen(q), 1);
     htprintf(ctx, "</code>\n");

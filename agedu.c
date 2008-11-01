@@ -31,6 +31,16 @@
 
 #define lenof(x) (sizeof((x))/sizeof(*(x)))
 
+/*
+ * Path separator. This global variable affects the behaviour of
+ * various parts of the code when they need to deal with path
+ * separators. The path separator appropriate to a particular data
+ * set is encoded in the index file storing that data set; data
+ * sets generated on Unix will of course have the default '/', but
+ * foreign data sets are conceivable and must be handled correctly.
+ */
+char pathsep = '/';
+
 void fatal(const char *fmt, ...)
 {
     va_list ap;
@@ -86,7 +96,7 @@ static int gotdata(void *vctx, const char *pathname, const struct stat64 *st)
      * Filter based on wildcards.
      */
     include = 1;
-    filename = strrchr(pathname, '/');
+    filename = strrchr(pathname, pathsep);
     if (!filename)
 	filename = pathname;
     else
@@ -864,7 +874,7 @@ int main(int argc, char **argv)
 	 * Trim trailing slash, just in case.
 	 */
 	pathlen = strlen(querydir);
-	if (pathlen > 0 && querydir[pathlen-1] == '/')
+	if (pathlen > 0 && querydir[pathlen-1] == pathsep)
 	    querydir[--pathlen] = '\0';
 
 	text_query(mappedfile, querydir, textcutoff, 1);
@@ -895,7 +905,7 @@ int main(int argc, char **argv)
 	 * Trim trailing slash, just in case.
 	 */
 	pathlen = strlen(querydir);
-	if (pathlen > 0 && querydir[pathlen-1] == '/')
+	if (pathlen > 0 && querydir[pathlen-1] == pathsep)
 	    querydir[--pathlen] = '\0';
 
 	xi = trie_before(mappedfile, querydir);

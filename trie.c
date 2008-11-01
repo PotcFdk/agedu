@@ -16,6 +16,8 @@
 
 #define alignof(typ) ( offsetof(struct { char c; typ t; }, t) )
 
+extern char pathsep;
+
 /*
  * Compare functions for pathnames. Returns the relative order of
  * the names, like strcmp; also passes back the offset of the
@@ -23,9 +25,9 @@
  */
 static int trieccmp(unsigned char a, unsigned char b)
 {
-    a = (a == '\0' ? '\0' : a == '/' ? '\1' : a+1);
-    b = (b == '\0' ? '\0' : b == '/' ? '\1' : b+1);
-    return a - b;
+    a = (a == '\0' ? '\0' : a == pathsep ? '\1' : a+1);
+    b = (b == '\0' ? '\0' : b == pathsep ? '\1' : b+1);
+    return (int)a - (int)b;
 }
 
 static int triencmp(const char *a, size_t alen,

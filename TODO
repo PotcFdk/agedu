@@ -56,8 +56,8 @@ Before it's non-embarrassingly releasable:
        * what do we do elsewhere about _GNU_SOURCE?
 
  - prepare a little in advance for a potential future Windows port:
-    + store the separator character in the index file when writing
-      it, and be prepared to cope on reading if it isn't a slash
+    + store the path separator character in the index file when
+      writing it, and load it back in when reading
     + store literal byte sizes in all the size fields, instead of
       Unixoid 512-byte sectors
 
@@ -109,9 +109,16 @@ Future directions:
 
  - http://msdn.microsoft.com/en-us/library/ms724290.aspx suggest
    modern Windowses support atime-equivalents, so a Windows port is
-   possible in principle. Would need to modify the current structure
-   a lot, to abstract away (at least) memory-mapping of files,
-   details of disk scan procedure, networking for httpd. Unclear
-   what the right UI would be on Windows, too; command-line exactly
-   as now might be considered just a _little_ unfriendly. Or perhaps
-   not.
+   possible in principle.
+    + For a full Windows port, would need to modify the current
+      structure a lot, to abstract away (at least) memory-mapping of
+      files, details of disk scan procedure, networking for httpd.
+      Unclear what the right UI would be on Windows, too;
+      command-line exactly as now might be considered just a
+      _little_ unfriendly. Or perhaps not.
+    + Alternatively, a much easier approach would be to write a
+      Windows version of just the --scan-dump mode, which does a
+      filesystem scan via the Windows API and generates a valid
+      agedu dump file on standard output. Then one would simply feed
+      that over the network connection of one's choice to the rest
+      of agedu running on Unix as usual.

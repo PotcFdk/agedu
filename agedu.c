@@ -869,6 +869,7 @@ int main(int argc, char **argv)
 	    perror("agedu: mmap");
 	    return 1;
 	}
+	pathsep = trie_pathsep(mappedfile);
 
 	/*
 	 * Trim trailing slash, just in case.
@@ -900,6 +901,7 @@ int main(int argc, char **argv)
 	    perror("agedu: mmap");
 	    return 1;
 	}
+	pathsep = trie_pathsep(mappedfile);
 
 	/*
 	 * Trim trailing slash, just in case.
@@ -935,6 +937,7 @@ int main(int argc, char **argv)
 	    perror("agedu: mmap");
 	    return 1;
 	}
+	pathsep = trie_pathsep(mappedfile);
 
 	maxpathlen = trie_maxpathlen(mappedfile);
 	buf = snewn(maxpathlen, char);
@@ -964,6 +967,7 @@ int main(int argc, char **argv)
 	    perror("agedu: mmap");
 	    return 1;
 	}
+	pathsep = trie_pathsep(mappedfile);
 
 	dcfg.address = httpserveraddr;
 	dcfg.port = httpserverport;

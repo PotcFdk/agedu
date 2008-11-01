@@ -110,6 +110,7 @@ struct trie_header {
     off_t root, indexroot;
     int count;
     size_t maxpathlen;
+    int pathsep;
 };
 
 /* Union only used for computing alignment */
@@ -200,6 +201,7 @@ triebuild *triebuild_new(int fd)
     th.root = th.count = 0;
     th.indexroot = 0;
     th.maxpathlen = 0;
+    th.pathsep = (unsigned char)pathsep;
 
     tb_seek(tb, 0);
     tb_write(tb, &th, sizeof(th));
@@ -375,6 +377,7 @@ int triebuild_finish(triebuild *tb)
     th.root = triebuild_unwind(tb, 0, &th.count);
     th.indexroot = 0;
     th.maxpathlen = tb->maxpathlen;
+    th.pathsep = (unsigned char)pathsep;
 
     tb_seek(tb, 0);
     tb_write(tb, &th, sizeof(th));
@@ -494,6 +497,12 @@ unsigned long trie_count(const void *t)
 {
     const struct trie_header *hdr = NODE(t, 0, trie_header);
     return hdr->count;
+}
+
+char trie_pathsep(const void *t)
+{
+    const struct trie_header *hdr = NODE(t, 0, trie_header);
+    return (char)hdr->pathsep;
 }
 
 struct triewalk_switch {

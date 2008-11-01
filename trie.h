@@ -55,6 +55,11 @@ void triebuild_free(triebuild *tb);
  */
 
 /*
+ * Return the path separator character in use in the trie.
+ */
+char trie_pathsep(const void *t);
+
+/*
  * Return the length of the longest pathname stored in the trie,
  * including its trailing NUL.
  */

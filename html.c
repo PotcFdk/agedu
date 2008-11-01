@@ -463,7 +463,7 @@ char *html_query(const void *t, unsigned long index,
 	q = p + 1;
 	if (doing_href)
 	    htprintf(ctx, "</a>");
-	htescape(ctx, q, p - q, 1);
+	htescape(ctx, p, 1, 1);
     }
     htescape(ctx, q, strlen(q), 1);
     htprintf(ctx, "</code>\n");

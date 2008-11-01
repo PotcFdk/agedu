@@ -28,6 +28,8 @@
 
 #define PNAME "agedu"
 
+#define lenof(x) (sizeof((x))/sizeof(*(x)))
+
 void fatal(const char *fmt, ...)
 {
     va_list ap;
@@ -155,6 +157,111 @@ static void text_query(const void *mappedfile, const char *rootdir,
     }
 }
 
+/*
+ * Largely frivolous way to define all my command-line options. I
+ * present here a parametric macro which declares a series of
+ * _logical_ option identifiers, and for each one declares zero or
+ * more short option characters and zero or more long option
+ * words. Then I repeatedly invoke that macro with its arguments
+ * defined to be various other macros, which allows me to
+ * variously:
+ * 
+ *  - define an enum allocating a distinct integer value to each
+ *    logical option id
+ *  - define a string consisting of precisely all the short option
+ *    characters
+ *  - define a string array consisting of all the long option
+ *    strings
+ *  - define (with help from auxiliary enums) integer arrays
+ *    parallel to both of the above giving the logical option id
+ *    for each physical short and long option
+ *  - define an array indexed by logical option id indicating
+ *    whether the option in question takes a value.
+ *
+ * It's not at all clear to me that this trickery is actually
+ * particularly _efficient_ - it still, after all, requires going
+ * linearly through the option list at run time and doing a
+ * strcmp, whereas in an ideal world I'd have liked the lists of
+ * long and short options to be pre-sorted so that a binary search
+ * or some other more efficient lookup was possible. (Not that
+ * asymptotic algorithmic complexity is remotely vital in option
+ * parsing, but if I were doing this in, say, Lisp or something
+ * with an equivalently powerful preprocessor then once I'd had
+ * the idea of preparing the option-parsing data structures at
+ * compile time I would probably have made the effort to prepare
+ * them _properly_. I could have Perl generate me a source file
+ * from some sort of description, I suppose, but that would seem
+ * like overkill. And in any case, it's more of a challenge to
+ * achieve as much as possible by cunning use of cpp and enum than
+ * to just write some sensible and logical code in a Turing-
+ * complete language. I said it was largely frivolous :-)
+ *
+ * This approach does have the virtue that it brings together the
+ * option ids and option spellings into a single combined list and
+ * defines them all in exactly one place. If I want to add a new
+ * option, or a new spelling for an option, I only have to modify
+ * the main OPTIONS macro below and then add code to process the
+ * new logical id.
+ *
+ * (Though, really, even that isn't ideal, since it still involves
+ * modifying the source file in more than one place. In a
+ * _properly_ ideal world, I'd be able to interleave the option
+ * definitions with the code fragments that process them. And then
+ * not bother defining logical identifiers for them at all - those
+ * would be automatically generated, since I wouldn't have any
+ * need to specify them manually in another part of the code.)
+ */
+
+#define OPTIONS(NOVAL, VAL, SHORT, LONG) \
+    NOVAL(HELP) SHORT(h) LONG(help) \
+    NOVAL(VERSION) SHORT(V) LONG(version) \
+    NOVAL(LICENCE) LONG(licence) LONG(license) \
+    NOVAL(SCAN) SHORT(s) LONG(scan) \
+    NOVAL(DUMP) SHORT(d) LONG(dump) \
+    NOVAL(TEXT) SHORT(t) LONG(text) \
+    NOVAL(HTML) SHORT(H) LONG(html) \
+    NOVAL(HTTPD) SHORT(w) LONG(web) LONG(server) LONG(httpd) \
+    NOVAL(PROGRESS) LONG(progress) LONG(scan_progress) \
+    NOVAL(NOPROGRESS) LONG(no_progress) LONG(no_scan_progress) \
+    NOVAL(TTYPROGRESS) LONG(tty_progress) LONG(tty_scan_progress) \
+		       LONG(progress_tty) LONG(scan_progress_tty) \
+    NOVAL(CROSSFS) LONG(cross_fs) \
+    NOVAL(NOCROSSFS) LONG(no_cross_fs) \
+    VAL(DATAFILE) SHORT(f) LONG(file) \
+    VAL(MINAGE) SHORT(a) LONG(age) LONG(min_age) LONG(minimum_age) \
+    VAL(AUTH) LONG(auth) LONG(http_auth) LONG(httpd_auth) \
+              LONG(server_auth) LONG(web_auth) \
+    VAL(INCLUDE) LONG(include) \
+    VAL(INCLUDEPATH) LONG(include_path) \
+    VAL(EXCLUDE) LONG(exclude) \
+    VAL(EXCLUDEPATH) LONG(exclude_path)
+
+#define IGNORE(x)
+#define DEFENUM(x) OPT_ ## x,
+#define ZERO(x) 0,
+#define ONE(x) 1,
+#define STRING(x) #x ,
+#define STRINGNOCOMMA(x) #x
+#define SHORTNEWOPT(x) SHORTtmp_ ## x = OPT_ ## x,
+#define SHORTTHISOPT(x) SHORTtmp2_ ## x, SHORTVAL_ ## x = SHORTtmp2_ ## x - 1,
+#define SHORTOPTVAL(x) SHORTVAL_ ## x,
+#define SHORTTMP(x) SHORTtmp3_ ## x,
+#define LONGNEWOPT(x) LONGtmp_ ## x = OPT_ ## x,
+#define LONGTHISOPT(x) LONGtmp2_ ## x, LONGVAL_ ## x = LONGtmp2_ ## x - 1,
+#define LONGOPTVAL(x) LONGVAL_ ## x,
+#define LONGTMP(x) SHORTtmp3_ ## x,
+
+enum { OPTIONS(DEFENUM,DEFENUM,IGNORE,IGNORE) NOPTIONS };
+enum { OPTIONS(IGNORE,IGNORE,SHORTTMP,IGNORE) NSHORTOPTS };
+enum { OPTIONS(IGNORE,IGNORE,IGNORE,LONGTMP) NLONGOPTS };
+static const int opthasval[NOPTIONS] = {OPTIONS(ZERO,ONE,IGNORE,IGNORE)};
+static const char shortopts[] = {OPTIONS(IGNORE,IGNORE,STRINGNOCOMMA,IGNORE)};
+static const char *const longopts[] = {OPTIONS(IGNORE,IGNORE,IGNORE,STRING)};
+enum { OPTIONS(SHORTNEWOPT,SHORTNEWOPT,SHORTTHISOPT,IGNORE) };
+enum { OPTIONS(LONGNEWOPT,LONGNEWOPT,IGNORE,LONGTHISOPT) };
+static const int shortvals[] = {OPTIONS(IGNORE,IGNORE,SHORTOPTVAL,IGNORE)};
+static const int longvals[] = {OPTIONS(IGNORE,IGNORE,IGNORE,LONGOPTVAL)};
+
 int main(int argc, char **argv)
 {
     int fd, count;
@@ -176,161 +283,220 @@ int main(int argc, char **argv)
     int ninex = 0, inexsize = 0;
     int crossfs = 0;
 
+#ifdef DEBUG_MAD_OPTION_PARSING_MACROS
+    {
+	static const char *const optnames[NOPTIONS] = {
+	    OPTIONS(STRING,STRING,IGNORE,IGNORE)
+	};
+	int i;
+	for (i = 0; i < NSHORTOPTS; i++)
+	    printf("-%c == %s [%s]\n", shortopts[i], optnames[shortvals[i]],
+		   opthasval[shortvals[i]] ? "value" : "no value");
+	for (i = 0; i < NLONGOPTS; i++)
+	    printf("--%s == %s [%s]\n", longopts[i], optnames[longvals[i]],
+		   opthasval[longvals[i]] ? "value" : "no value");
+    }
+#endif
+
     while (--argc > 0) {
         char *p = *++argv;
-        char *optval;
 
         if (doing_opts && *p == '-') {
+	    int wordstart = 1;
+
             if (!strcmp(p, "--")) {
                 doing_opts = 0;
-            } else if (p[1] == '-') {
-		char *optval = strchr(p, '=');
-		if (optval)
-		    *optval++ = '\0';
-		if (!strcmp(p, "--help")) {
-		    printf("FIXME: usage();\n");
-		    return 0;
-		} else if (!strcmp(p, "--version")) {
-		    printf("FIXME: version();\n");
-		    return 0;
-		} else if (!strcmp(p, "--licence") ||
-			   !strcmp(p, "--license")) {
-		    printf("FIXME: licence();\n");
-		    return 0;
-		} else if (!strcmp(p, "--scan")) {
-		    mode = SCAN;
-		} else if (!strcmp(p, "--dump")) {
-		    mode = DUMP;
-		} else if (!strcmp(p, "--text")) {
-		    mode = TEXT;
-		} else if (!strcmp(p, "--html")) {
-		    mode = HTML;
-		} else if (!strcmp(p, "--httpd") ||
-			   !strcmp(p, "--server")) {
-		    mode = HTTPD;
-		} else if (!strcmp(p, "--progress") ||
-			   !strcmp(p, "--scan-progress")) {
-		    progress = 2;
-		} else if (!strcmp(p, "--no-progress") ||
-			   !strcmp(p, "--no-scan-progress")) {
-		    progress = 0;
-		} else if (!strcmp(p, "--tty-progress") ||
-			   !strcmp(p, "--tty-scan-progress") ||
-			   !strcmp(p, "--progress-tty") ||
-			   !strcmp(p, "--scan-progress-tty")) {
-		    progress = 1;
-		} else if (!strcmp(p, "--crossfs")) {
-		    crossfs = 1;
-		} else if (!strcmp(p, "--no-crossfs")) {
-		    crossfs = 0;
-		} else if (!strcmp(p, "--file") ||
-			   !strcmp(p, "--auth") ||
-			   !strcmp(p, "--http-auth") ||
-			   !strcmp(p, "--httpd-auth") ||
-			   !strcmp(p, "--server-auth") ||
-			   !strcmp(p, "--minimum-age") ||
-			   !strcmp(p, "--min-age") ||
-			   !strcmp(p, "--age") ||
-			   !strcmp(p, "--include") ||
-			   !strcmp(p, "--include-path") ||
-			   !strcmp(p, "--exclude") ||
-			   !strcmp(p, "--exclude-path")) {
+		continue;
+            }
+
+	    p++;
+	    while (*p) {
+		int optid = -1;
+		int i;
+		char *optval;
+
+		if (wordstart && *p == '-') {
 		    /*
-		     * Long options requiring values.
+		     * GNU-style long option.
 		     */
-		    if (!optval) {
-			if (--argc > 0) {
-			    optval = *++argv;
-			} else {
-			    fprintf(stderr, "%s: option '%s' requires"
-				    " an argument\n", PNAME, p);
-			    return 1;
+		    p++;
+		    optval = strchr(p, '=');
+		    if (optval)
+			*optval++ = '\0';
+
+		    for (i = 0; i < NLONGOPTS; i++) {
+			const char *opt = longopts[i], *s = p;
+			int match = 1;
+			/*
+			 * The underscores in the option names
+			 * defined above may be given by the user
+			 * as underscores or dashes, or omitted
+			 * entirely.
+			 */
+			while (*opt) {
+			    if (*opt == '_') {
+				if (*s == '-' || *s == '_')
+				    s++;
+			    } else {
+				if (*opt != *s) {
+				    match = 0;
+				    break;
+				}
+				s++;
+			    }
+			    opt++;
+			}
+			if (match && !*s) {
+			    optid = longvals[i];
+			    break;
 			}
 		    }
-		    if (!strcmp(p, "--file")) {
-			filename = optval;
-		    } else if (!strcmp(p, "--minimum-age") ||
-			       !strcmp(p, "--min-age") ||
-			       !strcmp(p, "--age")) {
-			minage = optval;
-		    } else if (!strcmp(p, "--auth") ||
-			       !strcmp(p, "--http-auth") ||
-			       !strcmp(p, "--httpd-auth") ||
-			       !strcmp(p, "--server-auth")) {
-			if (!strcmp(optval, "magic"))
-			    auth = HTTPD_AUTH_MAGIC;
-			else if (!strcmp(optval, "basic"))
-			    auth = HTTPD_AUTH_BASIC;
-			else if (!strcmp(optval, "none"))
-			    auth = HTTPD_AUTH_NONE;
-			else if (!strcmp(optval, "default"))
-			    auth = HTTPD_AUTH_MAGIC | HTTPD_AUTH_BASIC;
-			else {
-			    fprintf(stderr, "%s: unrecognised authentication"
-				    " type '%s'\n%*s  options are 'magic',"
-				    " 'basic', 'none', 'default'\n",
-				    PNAME, optval, (int)strlen(PNAME), "");
+
+		    if (optid < 0) {
+			fprintf(stderr, "%s: unrecognised option '--%s'\n",
+				PNAME, p);
+			return 1;
+		    }
+
+		    if (!opthasval[optid]) {
+			if (optval) {
+			    fprintf(stderr, "%s: unexpected argument to option"
+				    " '--%s'\n", PNAME, p);
 			    return 1;
 			}
-		    } else if (!strcmp(p, "--include") ||
-			       !strcmp(p, "--include-path") ||
-			       !strcmp(p, "--exclude") ||
-			       !strcmp(p, "--exclude-path")) {
-			if (ninex >= inexsize) {
-			    inexsize = ninex * 3 / 2 + 16;
-			    inex = sresize(inex, inexsize,
-					   struct inclusion_exclusion);
+		    } else {
+			if (!optval) {
+			    if (--argc > 0) {
+				optval = *++argv;
+			    } else {
+				fprintf(stderr, "%s: option '--%s' expects"
+					" an argument\n", PNAME, p);
+				return 1;
+			    }
 			}
-			inex[ninex].path = (!strcmp(p, "--include-path") ||
-					    !strcmp(p, "--exclude-path"));
-			inex[ninex].include = (!strcmp(p, "--include") ||
-					       !strcmp(p, "--include-path"));
-			inex[ninex].wildcard = optval;
-			ninex++;
 		    }
+
+		    p += strlen(p);    /* finished with this argument word */
 		} else {
-		    fprintf(stderr, "%s: unrecognised option '%s'\n",
-			    PNAME, p);
-		    return 1;
-		}
-            } else {
-                p++;
-                while (*p) {
+		    /*
+		     * Short option.
+		     */
                     char c = *p++;
 
-                    switch (c) {
-                        /* Options requiring arguments. */
-		      case 'f':
-		      case 'a':
+		    for (i = 0; i < NSHORTOPTS; i++)
+			if (c == shortopts[i]) {
+			    optid = shortvals[i];
+			    break;
+			}
+
+		    if (optid < 0) {
+			fprintf(stderr, "%s: unrecognised option '-%c'\n",
+				PNAME, c);
+			return 1;
+		    }
+
+		    if (opthasval[optid]) {
                         if (*p) {
                             optval = p;
                             p += strlen(p);
                         } else if (--argc > 0) {
                             optval = *++argv;
                         } else {
-                            fprintf(stderr, "%s: option '-%c' requires"
+                            fprintf(stderr, "%s: option '-%c' expects"
                                     " an argument\n", PNAME, c);
                             return 1;
                         }
-                        switch (c) {
-			  case 'f':    /* data file name */
-			    filename = optval;
-			    break;
-			  case 'a':    /* maximum age */
-			    minage = optval;
-			    break;
-                        }
-                        break;
-		      case 's':
-			mode = SCAN;
-			break;
-                      default:
-                        fprintf(stderr, "%s: unrecognised option '-%c'\n",
-                                PNAME, c);
-                        return 1;
-                    }
-                }
-            }
+		    } else {
+			optval = NULL;
+		    }
+		}
+
+		wordstart = 0;
+
+		/*
+		 * Now actually process the option.
+		 */
+		switch (optid) {
+		  case OPT_HELP:
+		    printf("FIXME: usage();\n");
+		    return 0;
+		  case OPT_VERSION:
+		    printf("FIXME: version();\n");
+		    return 0;
+		  case OPT_LICENCE:
+		    printf("FIXME: licence();\n");
+		    return 0;
+		  case OPT_SCAN:
+		    mode = SCAN;
+		    break;
+		  case OPT_DUMP:
+		    mode = DUMP;
+		    break;
+		  case OPT_TEXT:
+		    mode = TEXT;
+		    break;
+		  case OPT_HTML:
+		    mode = HTML;
+		    break;
+		  case OPT_HTTPD:
+		    mode = HTTPD;
+		    break;
+		  case OPT_PROGRESS:
+		    progress = 2;
+		    break;
+		  case OPT_NOPROGRESS:
+		    progress = 0;
+		    break;
+		  case OPT_TTYPROGRESS:
+		    progress = 1;
+		    break;
+		  case OPT_CROSSFS:
+		    crossfs = 1;
+		    break;
+		  case OPT_NOCROSSFS:
+		    crossfs = 0;
+		    break;
+		  case OPT_DATAFILE:
+		    filename = optval;
+		    break;
+		  case OPT_MINAGE:
+		    minage = optval;
+		    break;
+		  case OPT_AUTH:
+		    if (!strcmp(optval, "magic"))
+			auth = HTTPD_AUTH_MAGIC;
+		    else if (!strcmp(optval, "basic"))
+			auth = HTTPD_AUTH_BASIC;
+		    else if (!strcmp(optval, "none"))
+			auth = HTTPD_AUTH_NONE;
+		    else if (!strcmp(optval, "default"))
+			auth = HTTPD_AUTH_MAGIC | HTTPD_AUTH_BASIC;
+		    else {
+			fprintf(stderr, "%s: unrecognised authentication"
+				" type '%s'\n%*s  options are 'magic',"
+				" 'basic', 'none', 'default'\n",
+				PNAME, optval, (int)strlen(PNAME), "");
+			return 1;
+		    }
+		    break;
+		  case OPT_INCLUDE:
+		  case OPT_INCLUDEPATH:
+		  case OPT_EXCLUDE:
+		  case OPT_EXCLUDEPATH:
+		    if (ninex >= inexsize) {
+			inexsize = ninex * 3 / 2 + 16;
+			inex = sresize(inex, inexsize,
+				       struct inclusion_exclusion);
+		    }
+		    inex[ninex].path = (optid == OPT_INCLUDEPATH ||
+					optid == OPT_EXCLUDEPATH);
+		    inex[ninex].include = (optid == OPT_INCLUDE ||
+					   optid == OPT_INCLUDEPATH);
+		    inex[ninex].wildcard = optval;
+		    ninex++;
+		    break;
+		}
+	    }
         } else {
 	    if (!rootdir) {
 		rootdir = p;

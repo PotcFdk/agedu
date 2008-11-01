@@ -429,7 +429,7 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
     socklen_t addrlen;
     struct html_config cfg = *incfg;
 
-    cfg.format = "%lu";
+    cfg.format = "%.0lu";
 
     /*
      * Establish the listening socket and retrieve its port

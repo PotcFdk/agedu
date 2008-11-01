@@ -446,7 +446,7 @@ char *html_query(const void *t, unsigned long index,
      */
     htprintf(ctx, "<p align=center>\n<code>");
     q = path;
-    for (p = strchr(path, pathsep); p; p = strchr(p, pathsep)) {
+    for (p = strchr(path, pathsep); p && p[1]; p = strchr(p, pathsep)) {
 	int doing_href = 0;
 	char c, *zp;
 
@@ -466,6 +466,8 @@ char *html_query(const void *t, unsigned long index,
 	trie_getpath(t, index2, path2);
 	if (!strcmp(path, path2) && cfg->format) {
 	    snprintf(href, hreflen, cfg->format, index2);
+	    if (!*href)		       /* special case that we understand */
+		strcpy(href, "./");
 	    htprintf(ctx, "<a href=\"%s\">", href);
 	    doing_href = 1;
 	}

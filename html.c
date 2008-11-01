@@ -166,12 +166,14 @@ static void get_indices(const void *t, char *path,
 			unsigned long *xi1, unsigned long *xi2)
 {
     size_t pathlen = strlen(path);
+    int c1 = path[pathlen], c2 = (pathlen > 0 ? path[pathlen-1] : 0);
 
     *xi1 = trie_before(t, path);
-    path[pathlen] = '\001';
-    path[pathlen+1] = '\0';
+    make_successor(path);
     *xi2 = trie_before(t, path);
-    path[pathlen] = '\0';
+    path[pathlen] = c1;
+    if (pathlen > 0)
+	path[pathlen-1] = c2;
 }
 
 static unsigned long long fetch_size(const void *t, char *path,
@@ -393,7 +395,7 @@ char *html_query(const void *t, unsigned long index,
     struct html actx, *ctx = &actx;
     char *path, *path2, *p, *q, *href;
     char agebuf1[80], agebuf2[80];
-    size_t pathlen, hreflen;
+    size_t pathlen, subdirpos, hreflen;
     unsigned long index2;
     int i;
     struct vector **vecs;
@@ -444,13 +446,22 @@ char *html_query(const void *t, unsigned long index,
      */
     htprintf(ctx, "<p align=center>\n<code>");
     q = path;
-    for (p = strchr(path, pathsep); p; p = strchr(p+1, pathsep)) {
+    for (p = strchr(path, pathsep); p; p = strchr(p, pathsep)) {
 	int doing_href = 0;
+	char c, *zp;
+
 	/*
 	 * See if this path prefix exists in the trie. If so,
 	 * generate a hyperlink.
 	 */
-	*p = '\0';
+	zp = p;
+	if (p == path)		       /* special case for "/" at start */
+	    zp++;
+
+	p++;
+
+	c = *zp;
+	*zp = '\0';
 	index2 = trie_before(t, path);
 	trie_getpath(t, index2, path2);
 	if (!strcmp(path, path2) && cfg->format) {
@@ -458,12 +469,12 @@ char *html_query(const void *t, unsigned long index,
 	    htprintf(ctx, "<a href=\"%s\">", href);
 	    doing_href = 1;
 	}
-	*p = pathsep;
-	htescape(ctx, q, p - q, 1);
-	q = p + 1;
+	*zp = c;
+	htescape(ctx, q, zp - q, 1);
 	if (doing_href)
 	    htprintf(ctx, "</a>");
-	htescape(ctx, p, 1, 1);
+	htescape(ctx, zp, p - zp, 1);
+	q = p;
     }
     htescape(ctx, q, strlen(q), 1);
     htprintf(ctx, "</code>\n");
@@ -529,6 +540,9 @@ char *html_query(const void *t, unsigned long index,
     get_indices(t, path, &xi1, &xi2);
     xi1++;
     pathlen = strlen(path);
+    subdirpos = pathlen + 1;
+    if (pathlen > 0 && path[pathlen-1] == pathsep)
+	subdirpos--;
     while (xi1 < xi2) {
 	trie_getpath(t, xi1, path2);
 	get_indices(t, ctx->path2, &xj1, &xj2);
@@ -540,7 +554,7 @@ char *html_query(const void *t, unsigned long index,
 	    vecs = sresize(vecs, vecsize, struct vector *);
 	}
 	assert(strlen(path2) > pathlen);
-	vecs[nvecs] = make_vector(ctx, path2, 1, path2 + pathlen + 1);
+	vecs[nvecs] = make_vector(ctx, path2, 1, path2 + subdirpos);
 	for (i = 0; i <= MAXCOLOUR; i++)
 	    vecs[0]->sizes[i] -= vecs[nvecs]->sizes[i];
 	nvecs++;

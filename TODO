@@ -25,22 +25,6 @@ Before it's non-embarrassingly releasable:
     + configurable recursive output depth
     + show the right bits last
 
- - figure out what to do about scans starting in the root directory
-    + Currently we end up with a double leading slash on the
-      pathnames, which is ugly, and we also get a zero-length href
-      in between those slashes which means the web interface doesn't
-      let you click back up to the top level at all.
-    + One big problem here is that a lot of the code assumes that
-      you can find the extent of a pathname by searching for "foo"
-      and "foo^A", trusting that anything inside the directory will
-      begin "foo/". So I'd need to consistently fix this everywhere
-      so that a trailing slash is disregarded while doing it, but
-      not actually removed.
-    + The text output gets it all wrong.
-    + The HTML output is fiddly even at the design stage: where
-      would I _ideally_ put the link to click on to get back to /?
-      It's unclear!
-
  - cross-Unix portability:
     + use autoconf
        * configure use of stat64

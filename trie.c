@@ -617,3 +617,12 @@ off_t trie_get_index_offset(const void *t)
 {
     return ((const struct trie_header *)t)->indexroot;
 }
+
+void make_successor(char *pathbuf)
+{
+    int len = strlen(pathbuf);
+    if (len > 0 && pathbuf[len-1] == pathsep)
+	len--;
+    pathbuf[len] = '\001';
+    pathbuf[len+1] = '\0';
+}

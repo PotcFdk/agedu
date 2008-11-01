@@ -107,3 +107,19 @@ void triewalk_free(triewalk *tw);
  */
 void trie_set_index_offset(void *t, off_t ptr);
 off_t trie_get_index_offset(const void *t);
+
+/* ----------------------------------------------------------------------
+ * Utility functions not directly involved with the trie.
+ */
+
+/*
+ * Given a pathname in a buffer, adjust the pathname in place so
+ * that it points at a string which, when passed to trie_before,
+ * will reliably return the index of the thing that comes after
+ * that pathname and all its descendants. Usually this is done by
+ * suffixing ^A (since foo^A is guaranteeably the first thing that
+ * sorts after foo and foo/stuff); however, if the pathname
+ * actually ends in a path separator (e.g. if it's just "/"), that
+ * must be stripped off first.
+ */
+void make_successor(char *pathbuf);

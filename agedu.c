@@ -171,7 +171,8 @@ static void text_query(const void *mappedfile, const char *querydir,
      * (inclusive) and that filename with a ^A on the end
      * (exclusive). So find the x indices for each.
      */
-    sprintf(pathbuf, "%s\001", querydir);
+    strcpy(pathbuf, querydir);
+    make_successor(pathbuf);
     xi1 = trie_before(mappedfile, querydir);
     xi2 = trie_before(mappedfile, pathbuf);
 
@@ -196,7 +197,7 @@ static void text_query(const void *mappedfile, const char *querydir,
 	while (xi1 < xi2) {
 	    trie_getpath(mappedfile, xi1, pathbuf);
 	    text_query(mappedfile, pathbuf, t, depth-1);
-	    strcat(pathbuf, "\001");
+	    make_successor(pathbuf);
 	    xi1 = trie_before(mappedfile, pathbuf);
 	}
     }

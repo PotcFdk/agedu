@@ -114,7 +114,16 @@ static void du_recurse(char **path, size_t pathlen, size_t *pathsize,
 	    *pathsize = newpathlen * 3 / 2 + 256;
 	    *path = sresize(*path, *pathsize, char);
 	}
-	sprintf(*path + pathlen, "/%s", names[i]);
+	/*
+	 * Avoid duplicating a slash if we got a trailing one to
+	 * begin with (i.e. if we're starting the scan in '/' itself).
+	 */
+	if (pathlen > 0 && (*path)[pathlen-1] == '/') {
+	    strcpy(*path + pathlen, names[i]);
+	    newpathlen--;
+	} else {
+	    sprintf(*path + pathlen, "/%s", names[i]);
+	}
 
 	du_recurse(path, newpathlen, pathsize, gotdata, gotdata_ctx);
 

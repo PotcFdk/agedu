@@ -43,7 +43,7 @@ void fatal(const char *fmt, ...)
 }
 
 struct inclusion_exclusion {
-    int include;
+    int type;
     const char *wildcard;
     int path;
 };
@@ -79,6 +79,9 @@ static int gotdata(void *vctx, const char *pathname, const struct stat64 *st)
     if (!ctx->crossfs && st->st_dev != ctx->filesystem_dev)
 	return 0;
 
+    file.blocks = st->st_blocks;
+    file.atime = st->st_atime;
+
     /*
      * Filter based on wildcards.
      */
@@ -90,15 +93,25 @@ static int gotdata(void *vctx, const char *pathname, const struct stat64 *st)
 	filename++;
     for (i = 0; i < ctx->ninex; i++) {
 	if (fnmatch(ctx->inex[i].wildcard,
-		    ctx->inex[i].path ? pathname : filename,
-		    FNM_PATHNAME) == 0)
-	    include = ctx->inex[i].include;
+		    ctx->inex[i].path ? pathname : filename, 0) == 0)
+	    include = ctx->inex[i].type;
     }
-    if (!include)
-	return 1;		       /* filter, but don't prune */
+    if (include == -1)
+	return 0;		       /* ignore this entry and any subdirs */
+    if (include == 0) {
+	/*
+	 * Here we are supposed to be filtering an entry out, but
+	 * still recursing into it if it's a directory. However,
+	 * we can't actually leave out any directory whose
+	 * subdirectories we then look at. So we cheat, in that
+	 * case, by setting the size to zero.
+	 */
+	if (!S_ISDIR(st->st_mode))
+	    return 0;		       /* just ignore */
+	else
+	    file.blocks = 0;
+    }
 
-    file.blocks = st->st_blocks;
-    file.atime = st->st_atime;
     triebuild_add(ctx->tb, pathname, &file);
 
     t = time(NULL);
@@ -249,6 +262,10 @@ static void text_query(const void *mappedfile, const char *querydir,
         HELPARG("wildcard") HELPOPT("[--scan] exclude files matching pattern") \
     VAL(EXCLUDEPATH) LONG(exclude_path) \
         HELPARG("wildcard") HELPOPT("[--scan] exclude pathnames matching pattern") \
+    VAL(PRUNE) LONG(prune) \
+        HELPARG("wildcard") HELPOPT("[--scan] prune files matching pattern") \
+    VAL(PRUNEPATH) LONG(prune_path) \
+        HELPARG("wildcard") HELPOPT("[--scan] prune pathnames matching pattern") \
     VAL(MINAGE) SHORT(a) LONG(age) LONG(min_age) LONG(minimum_age) \
         HELPARG("age") HELPOPT("[--text] include only files older than this") \
     VAL(AUTH) LONG(auth) LONG(http_auth) LONG(httpd_auth) \
@@ -554,15 +571,22 @@ int main(int argc, char **argv)
 		  case OPT_INCLUDEPATH:
 		  case OPT_EXCLUDE:
 		  case OPT_EXCLUDEPATH:
+		  case OPT_PRUNE:
+		  case OPT_PRUNEPATH:
 		    if (ninex >= inexsize) {
 			inexsize = ninex * 3 / 2 + 16;
 			inex = sresize(inex, inexsize,
 				       struct inclusion_exclusion);
 		    }
 		    inex[ninex].path = (optid == OPT_INCLUDEPATH ||
-					optid == OPT_EXCLUDEPATH);
-		    inex[ninex].include = (optid == OPT_INCLUDE ||
-					   optid == OPT_INCLUDEPATH);
+					optid == OPT_EXCLUDEPATH ||
+					optid == OPT_PRUNEPATH);
+		    inex[ninex].type = (optid == OPT_INCLUDE ? 1 :
+					optid == OPT_INCLUDEPATH ? 1 :
+					optid == OPT_EXCLUDE ? 0 :
+					optid == OPT_EXCLUDEPATH ? 0 :
+					optid == OPT_PRUNE ? -1 :
+					/* optid == OPT_PRUNEPATH ? */ -1);
 		    inex[ninex].wildcard = optval;
 		    ninex++;
 		    break;

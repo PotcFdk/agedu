@@ -17,10 +17,6 @@ Before it's non-embarrassingly releasable:
       hackery in du.c and turning it into a more sensible run-time
       abstraction layer.
 
- - polish the plain-text output to make it look more like du
-    + configurable recursive output depth
-    + show the right bits last
-
  - cross-Unix portability:
     + use autoconf
        * configure use of stat64
@@ -31,7 +27,7 @@ Before it's non-embarrassingly releasable:
 	    too, if it's available and O_NOATIME is too.
        * what do we do elsewhere about _GNU_SOURCE?
 
- - man page, licence, --version.
+ - man page, --version.
 
 Future possibilities:
 

@@ -13,7 +13,7 @@ CFLAGS = -Wall --std=c99 -pedantic $(XFLAGS)
 
 -include Makefile.local
 
-AGEDU_MODULES := agedu du malloc trie index html httpd fgetline
+AGEDU_MODULES := agedu du malloc trie index html httpd fgetline licence
 AGEDU_OBJS := $(patsubst %,%.o,$(AGEDU_MODULES))
 
 ALLMODULES := $(sort $(AGEDU_MODULES))

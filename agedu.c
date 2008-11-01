@@ -604,7 +604,15 @@ int main(int argc, char **argv)
 		    printf("FIXME: version();\n");
 		    return 0;
 		  case OPT_LICENCE:
-		    printf("FIXME: licence();\n");
+		    {
+			extern const char *const licence[];
+			int i;
+
+			for (i = 0; licence[i]; i++)
+			    fputs(licence[i], stdout);
+
+			return 0;
+		    }
 		    return 0;
 		  case OPT_SCAN:
 		    if (nactions >= actionsize) {

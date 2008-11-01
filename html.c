@@ -344,7 +344,7 @@ static void write_report_line(struct html *ctx, struct vector *vec)
     size = vec->sizes[MAXCOLOUR];
     htprintf(ctx, "<tr>\n"
 	     "<td style=\"padding: 0.2em; text-align: right\">%lluMb</td>\n",
-	     ((size + ((1<<11)-1)) >> 11)); /* convert to Mb, rounding up */
+	     ((size + ((1<<20)-1)) >> 20)); /* convert to Mb, rounding up */
 
     /*
      * Generate a colour bar.

@@ -4,10 +4,6 @@ TODO list for agedu
 Before it's non-embarrassingly releasable:
 
  - more flexible running modes
-    + combined scan+dump mode which doesn't even generate an index
-      file (nearly indistinguishable from find(1))
-    + load mode which reads a dump from standard input and builds
-      the index (need to nail down a perfectly general dump format)
     + at least some ability to chain actions within the same run:
       "agedu -s dirname -w" would seem handy.
 
@@ -54,12 +50,6 @@ Before it's non-embarrassingly releasable:
           + later glibcs have fdopendir, hooray! So we can use that
 	    too, if it's available and O_NOATIME is too.
        * what do we do elsewhere about _GNU_SOURCE?
-
- - prepare a little in advance for a potential future Windows port:
-    + store the path separator character in the index file when
-      writing it, and load it back in when reading
-    + store literal byte sizes in all the size fields, instead of
-      Unixoid 512-byte sectors
 
  - man page, licence.
 

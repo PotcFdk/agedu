@@ -139,7 +139,7 @@ static void avl_fix(indexbuild *ib, struct avlnode *n)
 			  MAXDEPTH(NODE(ib->t, n->children[1])));
 
     n->totalsize =
-	(ELEMENT(ib->t, n->element)->blocks +
+	(ELEMENT(ib->t, n->element)->size +
 	 (n->children[0] ? NODE(ib->t, n->children[0])->totalsize : 0) +
 	 (n->children[1] ? NODE(ib->t, n->children[1])->totalsize : 0));
 }
@@ -304,7 +304,7 @@ unsigned long long index_query(const void *t, int n, unsigned long long at)
 	} else {
 	    if (left)
 		ret += left->totalsize;
-	    ret += tf->blocks;
+	    ret += tf->size;
 	    node = right;
 	}
     }
@@ -334,12 +334,12 @@ unsigned long long index_order_stat(const void *t, double f)
 	if (left && size < left->totalsize) {
 	    node = left;
 	} else if (!right ||
-                   size < (left ? left->totalsize : 0) + tf->blocks) {
+                   size < (left ? left->totalsize : 0) + tf->size) {
 	    return tf->atime;
 	} else {
 	    if (left)
 		size -= left->totalsize;
-	    size -= tf->blocks;
+	    size -= tf->size;
 	    node = right;
 	}
     }

@@ -9,7 +9,7 @@
  * An entry in the trie file describing an actual file.
  */
 struct trie_file {
-    unsigned long long blocks;
+    unsigned long long size;
     unsigned long long atime;
 };
 

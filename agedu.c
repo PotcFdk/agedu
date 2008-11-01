@@ -261,7 +261,7 @@ static void text_query(const void *mappedfile, const char *querydir,
  */
 
 #define OPTHELP(NOVAL, VAL, SHORT, LONG, HELPPFX, HELPARG, HELPLINE, HELPOPT) \
-    HELPPFX("usage") HELPLINE("agedu [options] action") \
+    HELPPFX("usage") HELPLINE("agedu [options] action [action...]") \
     HELPPFX("actions") \
     VAL(SCAN) SHORT(s) LONG(scan) \
 	HELPARG("directory") HELPOPT("scan and index a directory") \
@@ -441,10 +441,13 @@ int main(int argc, char **argv)
     indexbuild *ib;
     const struct trie_file *tf;
     char *filename = "agedu.dat";
-    char *scandir = NULL;
-    char *querydir = NULL;
     int doing_opts = 1;
-    enum { USAGE, TEXT, HTML, SCAN, DUMP, SCANDUMP, LOAD, HTTPD } mode = USAGE;
+    enum { TEXT, HTML, SCAN, DUMP, SCANDUMP, LOAD, HTTPD };
+    struct action {
+	int mode;
+	char *arg;
+    } *actions = NULL;
+    int nactions = 0, actionsize = 0, action;
     time_t now = time(NULL);
     time_t textcutoff = now, htmlnewest = now, htmloldest = now;
     int htmlautoagerange = 1;
@@ -601,29 +604,67 @@ int main(int argc, char **argv)
 		    printf("FIXME: licence();\n");
 		    return 0;
 		  case OPT_SCAN:
-		    mode = SCAN;
-		    scandir = optval;
+		    if (nactions >= actionsize) {
+			actionsize = nactions * 3 / 2 + 16;
+			actions = sresize(actions, actionsize, struct action);
+		    }
+		    actions[nactions].mode = SCAN;
+		    actions[nactions].arg = optval;
+		    nactions++;
 		    break;
 		  case OPT_SCANDUMP:
-		    mode = SCANDUMP;
-		    scandir = optval;
+		    if (nactions >= actionsize) {
+			actionsize = nactions * 3 / 2 + 16;
+			actions = sresize(actions, actionsize, struct action);
+		    }
+		    actions[nactions].mode = SCANDUMP;
+		    actions[nactions].arg = optval;
+		    nactions++;
 		    break;
 		  case OPT_DUMP:
-		    mode = DUMP;
+		    if (nactions >= actionsize) {
+			actionsize = nactions * 3 / 2 + 16;
+			actions = sresize(actions, actionsize, struct action);
+		    }
+		    actions[nactions].mode = DUMP;
+		    actions[nactions].arg = NULL;
+		    nactions++;
 		    break;
 		  case OPT_LOAD:
-		    mode = LOAD;
+		    if (nactions >= actionsize) {
+			actionsize = nactions * 3 / 2 + 16;
+			actions = sresize(actions, actionsize, struct action);
+		    }
+		    actions[nactions].mode = LOAD;
+		    actions[nactions].arg = NULL;
+		    nactions++;
 		    break;
 		  case OPT_TEXT:
-		    querydir = optval;
-		    mode = TEXT;
+		    if (nactions >= actionsize) {
+			actionsize = nactions * 3 / 2 + 16;
+			actions = sresize(actions, actionsize, struct action);
+		    }
+		    actions[nactions].mode = TEXT;
+		    actions[nactions].arg = optval;
+		    nactions++;
 		    break;
 		  case OPT_HTML:
-		    mode = HTML;
-		    querydir = optval;
+		    if (nactions >= actionsize) {
+			actionsize = nactions * 3 / 2 + 16;
+			actions = sresize(actions, actionsize, struct action);
+		    }
+		    actions[nactions].mode = HTML;
+		    actions[nactions].arg = optval;
+		    nactions++;
 		    break;
 		  case OPT_HTTPD:
-		    mode = HTTPD;
+		    if (nactions >= actionsize) {
+			actionsize = nactions * 3 / 2 + 16;
+			actions = sresize(actions, actionsize, struct action);
+		    }
+		    actions[nactions].mode = HTTPD;
+		    actions[nactions].arg = NULL;
+		    nactions++;
 		    break;
 		  case OPT_PROGRESS:
 		    progress = 2;
@@ -779,30 +820,208 @@ int main(int argc, char **argv)
         }
     }
 
-    if (mode == USAGE) {
+    if (nactions == 0) {
 	usage(stderr);
 	return 1;
-    } else if (mode == SCAN || mode == SCANDUMP || mode == LOAD) {
+    }
 
-	if (mode == LOAD) {
-	    char *buf = fgetline(stdin);
-	    unsigned newpathsep;
-	    buf[strcspn(buf, "\r\n")] = '\0';
-	    if (1 != sscanf(buf, "agedu dump file. pathsep=%x",
-			    &newpathsep)) {
-		fprintf(stderr, "%s: header in dump file not recognised\n",
-			PNAME);
-		return 1;
+    for (action = 0; action < nactions; action++) {
+	int mode = actions[action].mode;
+
+	if (mode == SCAN || mode == SCANDUMP || mode == LOAD) {
+	    const char *scandir = actions[action].arg;
+	    if (mode == LOAD) {
+		char *buf = fgetline(stdin);
+		unsigned newpathsep;
+		buf[strcspn(buf, "\r\n")] = '\0';
+		if (1 != sscanf(buf, "agedu dump file. pathsep=%x",
+				&newpathsep)) {
+		    fprintf(stderr, "%s: header in dump file not recognised\n",
+			    PNAME);
+		    return 1;
+		}
+		pathsep = (char)newpathsep;
+		sfree(buf);
 	    }
-	    pathsep = (char)newpathsep;
-	    sfree(buf);
-	}
 
-	if (mode == SCAN || mode == LOAD) {
+	    if (mode == SCAN || mode == LOAD) {
+		/*
+		 * Prepare to write out the index file.
+		 */
+		fd = open(filename, O_RDWR | O_TRUNC | O_CREAT, S_IRWXU);
+		if (fd < 0) {
+		    fprintf(stderr, "%s: %s: open: %s\n", PNAME, filename,
+			    strerror(errno));
+		    return 1;
+		}
+		if (fstat(fd, &st) < 0) {
+		    perror("agedu: fstat");
+		    return 1;
+		}
+		ctx->datafile_dev = st.st_dev;
+		ctx->datafile_ino = st.st_ino;
+		ctx->straight_to_dump = 0;
+	    } else {
+		ctx->datafile_dev = -1;
+		ctx->datafile_ino = -1;
+		ctx->straight_to_dump = 1;
+	    }
+
+	    if (mode == SCAN || mode == SCANDUMP) {
+		if (stat(scandir, &st) < 0) {
+		    fprintf(stderr, "%s: %s: stat: %s\n", PNAME, scandir,
+			    strerror(errno));
+		    return 1;
+		}
+		ctx->filesystem_dev = crossfs ? 0 : st.st_dev;
+	    }
+
+	    ctx->inex = inex;
+	    ctx->ninex = ninex;
+	    ctx->crossfs = crossfs;
+
+	    ctx->last_output_update = time(NULL);
+
+	    /* progress==1 means report progress only if stderr is a tty */
+	    if (progress == 1)
+		progress = isatty(2) ? 2 : 0;
+	    ctx->progress = progress;
+	    {
+		struct winsize ws;
+		if (progress && ioctl(2, TIOCGWINSZ, &ws) == 0)
+		    ctx->progwidth = ws.ws_col - 1;
+		else
+		    ctx->progwidth = 79;
+	    }
+
+	    if (mode == SCANDUMP)
+		printf("agedu dump file. pathsep=%02x\n", (unsigned char)pathsep);
+
 	    /*
-	     * Prepare to write out the index file.
+	     * Scan the directory tree, and write out the trie component
+	     * of the data file.
 	     */
-	    fd = open(filename, O_RDWR | O_TRUNC | O_CREAT, S_IRWXU);
+	    if (mode != SCANDUMP) {
+		ctx->tb = triebuild_new(fd);
+	    }
+	    if (mode == LOAD) {
+		char *buf;
+		int line = 2;
+		while ((buf = fgetline(stdin)) != NULL) {
+		    struct trie_file tf;
+		    char *p, *q;
+
+		    buf[strcspn(buf, "\r\n")] = '\0';
+
+		    p = buf;
+		    q = p;
+		    while (*p && *p != ' ') p++;
+		    if (!*p) {
+			fprintf(stderr, "%s: dump file line %d: expected at least"
+				" three fields\n", PNAME, line);
+			return 1;
+		    }
+		    *p++ = '\0';
+		    tf.size = strtoull(q, NULL, 10);
+		    q = p;
+		    while (*p && *p != ' ') p++;
+		    if (!*p) {
+			fprintf(stderr, "%s: dump file line %d: expected at least"
+				" three fields\n", PNAME, line);
+			return 1;
+		    }
+		    *p++ = '\0';
+		    tf.atime = strtoull(q, NULL, 10);
+		    q = buf;
+		    while (*p) {
+			int c = *p;
+			if (*p == '%') {
+			    int i;
+			    p++;
+			    c = 0;
+			    for (i = 0; i < 2; i++) {
+				if (*p >= '0' && *p <= '9')
+				    c += *p - '0';
+				else if (*p >= 'A' && *p <= 'F')
+				    c += *p - ('A' - 10);
+				else if (*p >= 'a' && *p <= 'f')
+				    c += *p - ('a' - 10);
+				else {
+				    fprintf(stderr, "%s: dump file line %d: unable"
+					    " to parse hex escape\n", PNAME, line);
+				}
+				p++;
+			    }
+			}
+			*q++ = c;
+			p++;
+		    }
+		    *q = '\0';
+		    triebuild_add(ctx->tb, buf, &tf);
+		    sfree(buf);
+		}
+	    } else {
+		du(scandir, gotdata, ctx);
+	    }
+	    if (mode != SCANDUMP) {
+		count = triebuild_finish(ctx->tb);
+		triebuild_free(ctx->tb);
+
+		if (ctx->progress) {
+		    fprintf(stderr, "%-*s\r", ctx->progwidth, "");
+		    fflush(stderr);
+		}
+
+		/*
+		 * Work out how much space the cumulative index trees
+		 * will take; enlarge the file, and memory-map it.
+		 */
+		if (fstat(fd, &st) < 0) {
+		    perror("agedu: fstat");
+		    return 1;
+		}
+
+		printf("Built pathname index, %d entries, %ju bytes\n", count,
+		       (intmax_t)st.st_size);
+
+		totalsize = index_compute_size(st.st_size, count);
+
+		if (lseek(fd, totalsize-1, SEEK_SET) < 0) {
+		    perror("agedu: lseek");
+		    return 1;
+		}
+		if (write(fd, "\0", 1) < 1) {
+		    perror("agedu: write");
+		    return 1;
+		}
+
+		printf("Upper bound on index file size = %ju bytes\n",
+		       (intmax_t)totalsize);
+
+		mappedfile = mmap(NULL, totalsize, PROT_READ|PROT_WRITE,MAP_SHARED, fd, 0);
+		if (!mappedfile) {
+		    perror("agedu: mmap");
+		    return 1;
+		}
+
+		ib = indexbuild_new(mappedfile, st.st_size, count);
+		tw = triewalk_new(mappedfile);
+		while ((tf = triewalk_next(tw, NULL)) != NULL)
+		    indexbuild_add(ib, tf);
+		triewalk_free(tw);
+		realsize = indexbuild_realsize(ib);
+		indexbuild_free(ib);
+
+		munmap(mappedfile, totalsize);
+		ftruncate(fd, realsize);
+		close(fd);
+		printf("Actual index file size = %ju bytes\n", (intmax_t)realsize);
+	    }
+	} else if (mode == TEXT) {
+	    char *querydir = actions[action].arg;
+	    size_t pathlen;
+
+	    fd = open(filename, O_RDONLY);
 	    if (fd < 0) {
 		fprintf(stderr, "%s: %s: open: %s\n", PNAME, filename,
 			strerror(errno));
@@ -812,292 +1031,122 @@ int main(int argc, char **argv)
 		perror("agedu: fstat");
 		return 1;
 	    }
-	    ctx->datafile_dev = st.st_dev;
-	    ctx->datafile_ino = st.st_ino;
-	    ctx->straight_to_dump = 0;
-	} else {
-	    ctx->datafile_dev = -1;
-	    ctx->datafile_ino = -1;
-	    ctx->straight_to_dump = 1;
-	}
-
-	if (mode == SCAN || mode == SCANDUMP) {
-	    if (stat(scandir, &st) < 0) {
-		fprintf(stderr, "%s: %s: stat: %s\n", PNAME, scandir,
-			strerror(errno));
-		return 1;
-	    }
-	    ctx->filesystem_dev = crossfs ? 0 : st.st_dev;
-	}
-
-	ctx->inex = inex;
-	ctx->ninex = ninex;
-	ctx->crossfs = crossfs;
-
-	ctx->last_output_update = time(NULL);
-
-	/* progress==1 means report progress only if stderr is a tty */
-	if (progress == 1)
-	    progress = isatty(2) ? 2 : 0;
-	ctx->progress = progress;
-	{
-	    struct winsize ws;
-	    if (progress && ioctl(2, TIOCGWINSZ, &ws) == 0)
-		ctx->progwidth = ws.ws_col - 1;
-	    else
-		ctx->progwidth = 79;
-	}
-
-	if (mode == SCANDUMP)
-	    printf("agedu dump file. pathsep=%02x\n", (unsigned char)pathsep);
-
-	/*
-	 * Scan the directory tree, and write out the trie component
-	 * of the data file.
-	 */
-	if (mode != SCANDUMP) {
-	    ctx->tb = triebuild_new(fd);
-	}
-	if (mode == LOAD) {
-	    char *buf;
-	    int line = 2;
-	    while ((buf = fgetline(stdin)) != NULL) {
-		struct trie_file tf;
-		char *p, *q;
-
-		buf[strcspn(buf, "\r\n")] = '\0';
-
-		p = buf;
-		q = p;
-		while (*p && *p != ' ') p++;
-		if (!*p) {
-		    fprintf(stderr, "%s: dump file line %d: expected at least"
-			    " three fields\n", PNAME, line);
-		    return 1;
-		}
-		*p++ = '\0';
-		tf.size = strtoull(q, NULL, 10);
-		q = p;
-		while (*p && *p != ' ') p++;
-		if (!*p) {
-		    fprintf(stderr, "%s: dump file line %d: expected at least"
-			    " three fields\n", PNAME, line);
-		    return 1;
-		}
-		*p++ = '\0';
-		tf.atime = strtoull(q, NULL, 10);
-		q = buf;
-		while (*p) {
-		    int c = *p;
-		    if (*p == '%') {
-			int i;
-			p++;
-			c = 0;
-			for (i = 0; i < 2; i++) {
-			    if (*p >= '0' && *p <= '9')
-				c += *p - '0';
-			    else if (*p >= 'A' && *p <= 'F')
-				c += *p - ('A' - 10);
-			    else if (*p >= 'a' && *p <= 'f')
-				c += *p - ('a' - 10);
-			    else {
-				fprintf(stderr, "%s: dump file line %d: unable"
-					" to parse hex escape\n", PNAME, line);
-			    }
-			    p++;
-			}
-		    }
-		    *q++ = c;
-		    p++;
-		}
-		*q = '\0';
-		triebuild_add(ctx->tb, buf, &tf);
-		sfree(buf);
-	    }
-	} else {
-	    du(scandir, gotdata, ctx);
-	}
-	if (mode != SCANDUMP) {
-	    count = triebuild_finish(ctx->tb);
-	    triebuild_free(ctx->tb);
-
-	    if (ctx->progress) {
-		fprintf(stderr, "%-*s\r", ctx->progwidth, "");
-		fflush(stderr);
-	    }
-
-	    /*
-	     * Work out how much space the cumulative index trees
-	     * will take; enlarge the file, and memory-map it.
-	     */
-	    if (fstat(fd, &st) < 0) {
-		perror("agedu: fstat");
-		return 1;
-	    }
-
-	    printf("Built pathname index, %d entries, %ju bytes\n", count,
-		   (intmax_t)st.st_size);
-
-	    totalsize = index_compute_size(st.st_size, count);
-
-	    if (lseek(fd, totalsize-1, SEEK_SET) < 0) {
-		perror("agedu: lseek");
-		return 1;
-	    }
-	    if (write(fd, "\0", 1) < 1) {
-		perror("agedu: write");
-		return 1;
-	    }
-
-	    printf("Upper bound on index file size = %ju bytes\n",
-		   (intmax_t)totalsize);
-
-	    mappedfile = mmap(NULL, totalsize, PROT_READ|PROT_WRITE,MAP_SHARED, fd, 0);
+	    totalsize = st.st_size;
+	    mappedfile = mmap(NULL, totalsize, PROT_READ, MAP_SHARED, fd, 0);
 	    if (!mappedfile) {
 		perror("agedu: mmap");
 		return 1;
 	    }
+	    pathsep = trie_pathsep(mappedfile);
 
-	    ib = indexbuild_new(mappedfile, st.st_size, count);
+	    /*
+	     * Trim trailing slash, just in case.
+	     */
+	    pathlen = strlen(querydir);
+	    if (pathlen > 0 && querydir[pathlen-1] == pathsep)
+		querydir[--pathlen] = '\0';
+
+	    text_query(mappedfile, querydir, textcutoff, 1);
+	} else if (mode == HTML) {
+	    char *querydir = actions[action].arg;
+	    size_t pathlen;
+	    struct html_config cfg;
+	    unsigned long xi;
+	    char *html;
+
+	    fd = open(filename, O_RDONLY);
+	    if (fd < 0) {
+		fprintf(stderr, "%s: %s: open: %s\n", PNAME, filename,
+			strerror(errno));
+		return 1;
+	    }
+	    if (fstat(fd, &st) < 0) {
+		perror("agedu: fstat");
+		return 1;
+	    }
+	    totalsize = st.st_size;
+	    mappedfile = mmap(NULL, totalsize, PROT_READ, MAP_SHARED, fd, 0);
+	    if (!mappedfile) {
+		perror("agedu: mmap");
+		return 1;
+	    }
+	    pathsep = trie_pathsep(mappedfile);
+
+	    /*
+	     * Trim trailing slash, just in case.
+	     */
+	    pathlen = strlen(querydir);
+	    if (pathlen > 0 && querydir[pathlen-1] == pathsep)
+		querydir[--pathlen] = '\0';
+
+	    xi = trie_before(mappedfile, querydir);
+	    cfg.format = NULL;
+	    cfg.autoage = htmlautoagerange;
+	    cfg.oldest = htmloldest;
+	    cfg.newest = htmlnewest;
+	    html = html_query(mappedfile, xi, &cfg);
+	    fputs(html, stdout);
+	} else if (mode == DUMP) {
+	    size_t maxpathlen;
+	    char *buf;
+
+	    fd = open(filename, O_RDONLY);
+	    if (fd < 0) {
+		fprintf(stderr, "%s: %s: open: %s\n", PNAME, filename,
+			strerror(errno));
+		return 1;
+	    }
+	    if (fstat(fd, &st) < 0) {
+		perror("agedu: fstat");
+		return 1;
+	    }
+	    totalsize = st.st_size;
+	    mappedfile = mmap(NULL, totalsize, PROT_READ, MAP_SHARED, fd, 0);
+	    if (!mappedfile) {
+		perror("agedu: mmap");
+		return 1;
+	    }
+	    pathsep = trie_pathsep(mappedfile);
+
+	    maxpathlen = trie_maxpathlen(mappedfile);
+	    buf = snewn(maxpathlen, char);
+
+	    printf("agedu dump file. pathsep=%02x\n", (unsigned char)pathsep);
 	    tw = triewalk_new(mappedfile);
-	    while ((tf = triewalk_next(tw, NULL)) != NULL)
-		indexbuild_add(ib, tf);
+	    while ((tf = triewalk_next(tw, buf)) != NULL)
+		dump_line(buf, tf);
 	    triewalk_free(tw);
-	    realsize = indexbuild_realsize(ib);
-	    indexbuild_free(ib);
+	} else if (mode == HTTPD) {
+	    struct html_config pcfg;
+	    struct httpd_config dcfg;
 
-	    munmap(mappedfile, totalsize);
-	    ftruncate(fd, realsize);
-	    close(fd);
-	    printf("Actual index file size = %ju bytes\n", (intmax_t)realsize);
-	}
-    } else if (mode == TEXT) {
-	size_t pathlen;
+	    fd = open(filename, O_RDONLY);
+	    if (fd < 0) {
+		fprintf(stderr, "%s: %s: open: %s\n", PNAME, filename,
+			strerror(errno));
+		return 1;
+	    }
+	    if (fstat(fd, &st) < 0) {
+		perror("agedu: fstat");
+		return 1;
+	    }
+	    totalsize = st.st_size;
+	    mappedfile = mmap(NULL, totalsize, PROT_READ, MAP_SHARED, fd, 0);
+	    if (!mappedfile) {
+		perror("agedu: mmap");
+		return 1;
+	    }
+	    pathsep = trie_pathsep(mappedfile);
 
-	fd = open(filename, O_RDONLY);
-	if (fd < 0) {
-	    fprintf(stderr, "%s: %s: open: %s\n", PNAME, filename,
-		    strerror(errno));
-	    return 1;
+	    dcfg.address = httpserveraddr;
+	    dcfg.port = httpserverport;
+	    dcfg.basicauthdata = httpauthdata;
+	    pcfg.format = NULL;
+	    pcfg.autoage = htmlautoagerange;
+	    pcfg.oldest = htmloldest;
+	    pcfg.newest = htmlnewest;
+	    run_httpd(mappedfile, auth, &dcfg, &pcfg);
 	}
-	if (fstat(fd, &st) < 0) {
-	    perror("agedu: fstat");
-	    return 1;
-	}
-	totalsize = st.st_size;
-	mappedfile = mmap(NULL, totalsize, PROT_READ, MAP_SHARED, fd, 0);
-	if (!mappedfile) {
-	    perror("agedu: mmap");
-	    return 1;
-	}
-	pathsep = trie_pathsep(mappedfile);
-
-	/*
-	 * Trim trailing slash, just in case.
-	 */
-	pathlen = strlen(querydir);
-	if (pathlen > 0 && querydir[pathlen-1] == pathsep)
-	    querydir[--pathlen] = '\0';
-
-	text_query(mappedfile, querydir, textcutoff, 1);
-    } else if (mode == HTML) {
-	size_t pathlen;
-	struct html_config cfg;
-	unsigned long xi;
-	char *html;
-
-	fd = open(filename, O_RDONLY);
-	if (fd < 0) {
-	    fprintf(stderr, "%s: %s: open: %s\n", PNAME, filename,
-		    strerror(errno));
-	    return 1;
-	}
-	if (fstat(fd, &st) < 0) {
-	    perror("agedu: fstat");
-	    return 1;
-	}
-	totalsize = st.st_size;
-	mappedfile = mmap(NULL, totalsize, PROT_READ, MAP_SHARED, fd, 0);
-	if (!mappedfile) {
-	    perror("agedu: mmap");
-	    return 1;
-	}
-	pathsep = trie_pathsep(mappedfile);
-
-	/*
-	 * Trim trailing slash, just in case.
-	 */
-	pathlen = strlen(querydir);
-	if (pathlen > 0 && querydir[pathlen-1] == pathsep)
-	    querydir[--pathlen] = '\0';
-
-	xi = trie_before(mappedfile, querydir);
-	cfg.format = NULL;
-	cfg.autoage = htmlautoagerange;
-	cfg.oldest = htmloldest;
-	cfg.newest = htmlnewest;
-	html = html_query(mappedfile, xi, &cfg);
-	fputs(html, stdout);
-    } else if (mode == DUMP) {
-	size_t maxpathlen;
-	char *buf;
-
-	fd = open(filename, O_RDONLY);
-	if (fd < 0) {
-	    fprintf(stderr, "%s: %s: open: %s\n", PNAME, filename,
-		    strerror(errno));
-	    return 1;
-	}
-	if (fstat(fd, &st) < 0) {
-	    perror("agedu: fstat");
-	    return 1;
-	}
-	totalsize = st.st_size;
-	mappedfile = mmap(NULL, totalsize, PROT_READ, MAP_SHARED, fd, 0);
-	if (!mappedfile) {
-	    perror("agedu: mmap");
-	    return 1;
-	}
-	pathsep = trie_pathsep(mappedfile);
-
-	maxpathlen = trie_maxpathlen(mappedfile);
-	buf = snewn(maxpathlen, char);
-
-	printf("agedu dump file. pathsep=%02x\n", (unsigned char)pathsep);
-	tw = triewalk_new(mappedfile);
-	while ((tf = triewalk_next(tw, buf)) != NULL)
-	    dump_line(buf, tf);
-	triewalk_free(tw);
-    } else if (mode == HTTPD) {
-	struct html_config pcfg;
-	struct httpd_config dcfg;
-
-	fd = open(filename, O_RDONLY);
-	if (fd < 0) {
-	    fprintf(stderr, "%s: %s: open: %s\n", PNAME, filename,
-		    strerror(errno));
-	    return 1;
-	}
-	if (fstat(fd, &st) < 0) {
-	    perror("agedu: fstat");
-	    return 1;
-	}
-	totalsize = st.st_size;
-	mappedfile = mmap(NULL, totalsize, PROT_READ, MAP_SHARED, fd, 0);
-	if (!mappedfile) {
-	    perror("agedu: mmap");
-	    return 1;
-	}
-	pathsep = trie_pathsep(mappedfile);
-
-	dcfg.address = httpserveraddr;
-	dcfg.port = httpserverport;
-	dcfg.basicauthdata = httpauthdata;
-	pcfg.format = NULL;
-	pcfg.autoage = htmlautoagerange;
-	pcfg.oldest = htmloldest;
-	pcfg.newest = htmlnewest;
-	run_httpd(mappedfile, auth, &dcfg, &pcfg);
     }
 
     return 0;

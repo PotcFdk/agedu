@@ -3,10 +3,6 @@ TODO list for agedu
 
 Before it's non-embarrassingly releasable:
 
- - more flexible running modes
-    + at least some ability to chain actions within the same run:
-      "agedu -s dirname -w" would seem handy.
-
  - work out what to do about atimes on directories in the absence of
    the Linux syscall magic
     * one option is to read them during the scan and reinstate them
@@ -35,7 +31,7 @@ Before it's non-embarrassingly releasable:
 	    too, if it's available and O_NOATIME is too.
        * what do we do elsewhere about _GNU_SOURCE?
 
- - man page, licence.
+ - man page, licence, --version.
 
 Future possibilities:
 

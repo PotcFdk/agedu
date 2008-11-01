@@ -132,7 +132,7 @@ static void du_recurse(char **path, size_t pathlen, size_t *pathsize,
     sfree(names);
 }
 
-void du(char *inpath, gotdata_fn_t gotdata, void *gotdata_ctx)
+void du(const char *inpath, gotdata_fn_t gotdata, void *gotdata_ctx)
 {
     char *path;
     size_t pathlen, pathsize;

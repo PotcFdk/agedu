@@ -21,4 +21,4 @@ typedef int (*gotdata_fn_t)(void *ctx,
  * Recursively scan a directory tree and report every
  * space-consuming item in it to gotdata().
  */
-void du(char *path, gotdata_fn_t gotdata, void *gotdata_ctx);
+void du(const char *path, gotdata_fn_t gotdata, void *gotdata_ctx);

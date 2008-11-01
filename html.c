@@ -316,9 +316,16 @@ static void print_heading(struct html *ctx, const char *title)
 #define PIXEL_SIZE 600		       /* FIXME: configurability? */
 static void write_report_line(struct html *ctx, struct vector *vec)
 {
-    unsigned long long size, asize;
+    unsigned long long size, asize, divisor;
     int pix, newpix;
     int i;
+
+    /*
+     * Prevent divisions by zero.
+     */
+    divisor = ctx->totalsize;
+    if (!divisor)
+	divisor = 1;
 
     /*
      * Find the total size of this subdirectory.
@@ -336,7 +343,7 @@ static void write_report_line(struct html *ctx, struct vector *vec)
     pix = 0;
     for (i = 0; i <= MAXCOLOUR; i++) {
 	asize = vec->sizes[i];
-	newpix = asize * PIXEL_SIZE / ctx->totalsize;
+	newpix = asize * PIXEL_SIZE / divisor;
 	add_to_colour_bar(ctx, i, newpix - pix);
 	pix = newpix;
     }
@@ -348,7 +355,7 @@ static void write_report_line(struct html *ctx, struct vector *vec)
      * Output size as a percentage of totalsize.
      */
     htprintf(ctx, "<td style=\"padding: 0.2em; text-align: right\">"
-	     "%.2f%%</td>\n", (double)size / ctx->totalsize * 100.0);
+	     "%.2f%%</td>\n", (double)size / divisor * 100.0);
 
     /*
      * Output a subdirectory marker.

@@ -271,6 +271,8 @@ static void text_query(const void *mappedfile, const char *querydir,
         HELPARG("wildcard") HELPOPT("[--scan] prune pathnames matching pattern") \
     VAL(MINAGE) SHORT(a) LONG(age) LONG(min_age) LONG(minimum_age) \
         HELPARG("age") HELPOPT("[--text] include only files older than this") \
+    VAL(AGERANGE) SHORT(r) LONG(age_range) LONG(range) LONG(ages) \
+        HELPARG("age[-age]") HELPOPT("[--html,--web] set limits of colour coding") \
     VAL(AUTH) LONG(auth) LONG(http_auth) LONG(httpd_auth) \
               LONG(server_auth) LONG(web_auth) \
         HELPARG("type") HELPOPT("[--web] specify HTTP authentication method") \
@@ -349,6 +351,45 @@ static void usage(FILE *fp)
 #undef HELPOPT
 }
 
+static time_t parse_age(time_t now, const char *agestr)
+{
+    time_t t;
+    struct tm tm;
+    int nunits;
+    char unit[2];
+
+    t = now;
+
+    if (2 != sscanf(agestr, "%d%1[DdWwMmYy]", &nunits, unit)) {
+	fprintf(stderr, "%s: age specification should be a number followed by"
+		" one of d,w,m,y\n", PNAME);
+	exit(1);
+    }
+
+    if (unit[0] == 'd') {
+	t -= 86400 * nunits;
+    } else if (unit[0] == 'w') {
+	t -= 86400 * 7 * nunits;
+    } else {
+	int ym;
+
+	tm = *localtime(&t);
+	ym = tm.tm_year * 12 + tm.tm_mon;
+
+	if (unit[0] == 'm')
+	    ym -= nunits;
+	else
+	    ym -= 12 * nunits;
+
+	tm.tm_year = ym / 12;
+	tm.tm_mon = ym % 12;
+
+	t = mktime(&tm);
+    }
+
+    return t;
+}
+
 int main(int argc, char **argv)
 {
     int fd, count;
@@ -364,7 +405,9 @@ int main(int argc, char **argv)
     char *querydir = NULL;
     int doing_opts = 1;
     enum { USAGE, TEXT, HTML, SCAN, DUMP, HTTPD } mode = USAGE;
-    char *minage = "0d";
+    time_t now = time(NULL);
+    time_t textcutoff = now, htmlnewest = now, htmloldest = now;
+    int htmlautoagerange = 1;
     int auth = HTTPD_AUTH_MAGIC | HTTPD_AUTH_BASIC;
     int progress = 1;
     struct inclusion_exclusion *inex = NULL;
@@ -551,7 +594,19 @@ int main(int argc, char **argv)
 		    filename = optval;
 		    break;
 		  case OPT_MINAGE:
-		    minage = optval;
+		    textcutoff = parse_age(now, optval);
+		    break;
+		  case OPT_AGERANGE:
+		    if (!strcmp(optval, "auto")) {
+			htmlautoagerange = 1;
+		    } else {
+			char *q = optval + strcspn(optval, "-:");
+			if (*q)
+			    *q++ = '\0';
+			htmloldest = parse_age(now, optval);
+			htmlnewest = *q ? parse_age(now, q) : now;
+			htmlautoagerange = 0;
+		    }
 		    break;
 		  case OPT_AUTH:
 		    if (!strcmp(optval, "magic"))
@@ -562,7 +617,20 @@ int main(int argc, char **argv)
 			auth = HTTPD_AUTH_NONE;
 		    else if (!strcmp(optval, "default"))
 			auth = HTTPD_AUTH_MAGIC | HTTPD_AUTH_BASIC;
-		    else {
+		    else if (!strcmp(optval, "help") ||
+			     !strcmp(optval, "list")) {
+			printf("agedu: supported HTTP authentication types"
+			       " are:\n"
+			       "       magic      use Linux /proc/net/tcp to"
+			       " determine owner of peer socket\n"
+			       "       basic      HTTP Basic username and"
+			       " password authentication\n"
+			       "       default    use 'magic' if possible, "
+			       " otherwise fall back to 'basic'\n"
+			       "       none       unauthenticated HTTP (if"
+			       " the data file is non-confidential)\n");
+			return 0;
+		    } else {
 			fprintf(stderr, "%s: unrecognised authentication"
 				" type '%s'\n%*s  options are 'magic',"
 				" 'basic', 'none', 'default'\n",
@@ -703,40 +771,7 @@ int main(int argc, char **argv)
 	close(fd);
 	printf("Actual index file size = %ju bytes\n", (intmax_t)realsize);
     } else if (mode == TEXT) {
-	time_t t;
-	struct tm tm;
-	int nunits;
-	char unit[2];
 	size_t pathlen;
-
-	t = time(NULL);
-
-	if (2 != sscanf(minage, "%d%1[DdWwMmYy]", &nunits, unit)) {
-	    fprintf(stderr, "%s: minimum age should be a number followed by"
-		    " one of d,w,m,y\n", PNAME);
-	    return 1;
-	}
-
-	if (unit[0] == 'd') {
-	    t -= 86400 * nunits;
-	} else if (unit[0] == 'w') {
-	    t -= 86400 * 7 * nunits;
-	} else {
-	    int ym;
-
-	    tm = *localtime(&t);
-	    ym = tm.tm_year * 12 + tm.tm_mon;
-
-	    if (unit[0] == 'm')
-		ym -= nunits;
-	    else
-		ym -= 12 * nunits;
-
-	    tm.tm_year = ym / 12;
-	    tm.tm_mon = ym % 12;
-
-	    t = mktime(&tm);
-	}
 
 	fd = open(filename, O_RDONLY);
 	if (fd < 0) {
@@ -762,9 +797,10 @@ int main(int argc, char **argv)
 	if (pathlen > 0 && querydir[pathlen-1] == '/')
 	    querydir[--pathlen] = '\0';
 
-	text_query(mappedfile, querydir, t, 1);
+	text_query(mappedfile, querydir, textcutoff, 1);
     } else if (mode == HTML) {
 	size_t pathlen;
+	struct html_config cfg;
 	unsigned long xi;
 	char *html;
 
@@ -793,7 +829,11 @@ int main(int argc, char **argv)
 	    querydir[--pathlen] = '\0';
 
 	xi = trie_before(mappedfile, querydir);
-	html = html_query(mappedfile, xi, NULL);
+	cfg.format = NULL;
+	cfg.autoage = htmlautoagerange;
+	cfg.oldest = htmloldest;
+	cfg.newest = htmlnewest;
+	html = html_query(mappedfile, xi, &cfg);
 	fputs(html, stdout);
     } else if (mode == DUMP) {
 	size_t maxpathlen;
@@ -825,6 +865,8 @@ int main(int argc, char **argv)
 	}
 	triewalk_free(tw);
     } else if (mode == HTTPD) {
+	struct html_config cfg;
+
 	fd = open(filename, O_RDONLY);
 	if (fd < 0) {
 	    fprintf(stderr, "%s: %s: open: %s\n", PNAME, filename,
@@ -842,7 +884,11 @@ int main(int argc, char **argv)
 	    return 1;
 	}
 
-	run_httpd(mappedfile, auth);
+	cfg.format = NULL;
+	cfg.autoage = htmlautoagerange;
+	cfg.oldest = htmloldest;
+	cfg.newest = htmlnewest;
+	run_httpd(mappedfile, auth, &cfg);
     }
 
     return 0;

@@ -7,4 +7,4 @@
 #define HTTPD_AUTH_BASIC 2
 #define HTTPD_AUTH_NONE  4
 
-void run_httpd(const void *t, int authmask);
+void run_httpd(const void *t, int authmask, const struct html_config *cfg);

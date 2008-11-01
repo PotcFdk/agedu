@@ -385,7 +385,8 @@ static void write_report_line(struct html *ctx, struct vector *vec)
     htprintf(ctx, "</td>\n</tr>\n");
 }
 
-char *html_query(const void *t, unsigned long index, const char *format)
+char *html_query(const void *t, unsigned long index,
+		 const struct html_config *cfg)
 {
     struct html actx, *ctx = &actx;
     char *path, *path2, *p, *q, *href;
@@ -403,13 +404,13 @@ char *html_query(const void *t, unsigned long index, const char *format)
     ctx->buf = NULL;
     ctx->buflen = ctx->bufsize = 0;
     ctx->t = t;
-    ctx->format = format;
+    ctx->format = cfg->format;
     htprintf(ctx, "<html>\n");
 
     path = snewn(1+trie_maxpathlen(t), char);
     ctx->path2 = path2 = snewn(1+trie_maxpathlen(t), char);
-    if (format) {
-	hreflen = strlen(format) + 100;
+    if (cfg->format) {
+	hreflen = strlen(cfg->format) + 100;
 	href = snewn(hreflen, char);
     } else {
 	hreflen = 0;
@@ -450,8 +451,8 @@ char *html_query(const void *t, unsigned long index, const char *format)
 	*p = '\0';
 	index2 = trie_before(t, path);
 	trie_getpath(t, index2, path2);
-	if (!strcmp(path, path2) && format) {
-	    snprintf(href, hreflen, format, index2);
+	if (!strcmp(path, path2) && cfg->format) {
+	    snprintf(href, hreflen, cfg->format, index2);
 	    htprintf(ctx, "<a href=\"%s\">", href);
 	    doing_href = 1;
 	}
@@ -469,11 +470,18 @@ char *html_query(const void *t, unsigned long index, const char *format)
      * Decide on the age limit of our colour coding, establish the
      * colour thresholds, and write out a key.
      */
-    ctx->oldest = index_order_stat(t, 0.05);   /* FIXME: configurability? */
-    ctx->newest = index_order_stat(t, 1.0);
     ctx->now = time(NULL);
-    ctx->oldest = round_and_format_age(ctx, ctx->oldest, agebuf1, -1);
-    ctx->newest = round_and_format_age(ctx, ctx->newest, agebuf2, +1);
+    if (cfg->autoage) {
+	ctx->oldest = index_order_stat(t, 0.05);
+	ctx->newest = index_order_stat(t, 1.0);
+	ctx->oldest = round_and_format_age(ctx, ctx->oldest, agebuf1, -1);
+	ctx->newest = round_and_format_age(ctx, ctx->newest, agebuf2, +1);
+    } else {
+	ctx->oldest = cfg->oldest;
+	ctx->newest = cfg->newest;
+	ctx->oldest = round_and_format_age(ctx, ctx->oldest, agebuf1, 0);
+	ctx->newest = round_and_format_age(ctx, ctx->newest, agebuf2, 0);
+    }
     for (i = 0; i < MAXCOLOUR-1; i++) {
 	ctx->thresholds[i] =
 	    ctx->oldest + (ctx->newest - ctx->oldest) * i / MAXCOLOUR;

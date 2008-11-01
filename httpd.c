@@ -103,7 +103,8 @@ static char *http_success(char *mimetype, int stuff_cr, char *document)
  * socket before closing it.
  */
 char *got_data(struct connctx *ctx, char *data, int length,
-	       int magic_access, const char *auth_string)
+	       int magic_access, const char *auth_string,
+	       const struct html_config *cfg)
 {
     char *line, *p, *q, *r, *z1, *z2, c1, c2;
     int auth_provided = 0, auth_correct = 0;
@@ -288,7 +289,7 @@ char *got_data(struct connctx *ctx, char *data, int length,
 	    p = ctx->url;
 	    p += strspn(p, "/?");
 	    index = strtoul(p, NULL, 10);
-	    document = html_query(ctx->t, index, "%lu");
+	    document = html_query(ctx->t, index, cfg);
 	    if (document) {
 		ret = http_success("text/html", 1, document);
 		sfree(document);
@@ -416,7 +417,7 @@ static void base64_encode_atom(unsigned char *data, int n, char *out)
 	out[3] = '=';
 }
 
-void run_httpd(const void *t, int authmask)
+void run_httpd(const void *t, int authmask, const struct html_config *incfg)
 {
     int fd;
     int authtype;
@@ -425,6 +426,9 @@ void run_httpd(const void *t, int authmask)
     struct fd *f;
     struct sockaddr_in addr;
     socklen_t addrlen;
+    struct html_config cfg = *incfg;
+
+    cfg.format = "%lu";
 
     /*
      * Establish the listening socket and retrieve its port
@@ -666,7 +670,7 @@ void run_httpd(const void *t, int authmask)
 			    fds[i].wdata = got_data
 				(fds[i].cctx, readbuf, ret,
 				 (authtype == HTTPD_AUTH_NONE ||
-				  fds[i].magic_access), authstring);
+				  fds[i].magic_access), authstring, &cfg);
 			    if (fds[i].wdata) {
 				fds[i].wdatalen = strlen(fds[i].wdata);
 				fds[i].wdatapos = 0;

@@ -273,9 +273,16 @@ static void text_query(const void *mappedfile, const char *querydir,
         HELPARG("age") HELPOPT("[--text] include only files older than this") \
     VAL(AGERANGE) SHORT(r) LONG(age_range) LONG(range) LONG(ages) \
         HELPARG("age[-age]") HELPOPT("[--html,--web] set limits of colour coding") \
+    VAL(SERVERADDR) LONG(address) LONG(addr) LONG(server_address) \
+              LONG(server_addr) \
+        HELPARG("addr[:port]") HELPOPT("[--web] specify HTTP server address") \
     VAL(AUTH) LONG(auth) LONG(http_auth) LONG(httpd_auth) \
               LONG(server_auth) LONG(web_auth) \
         HELPARG("type") HELPOPT("[--web] specify HTTP authentication method") \
+    VAL(AUTHFILE) LONG(auth_file) \
+        HELPARG("filename") HELPOPT("[--web] read HTTP Basic user/pass from file") \
+    VAL(AUTHFD) LONG(auth_fd) \
+        HELPARG("fd") HELPOPT("[--web] read HTTP Basic user/pass from fd") \
     HELPPFX("also") \
     NOVAL(HELP) SHORT(h) LONG(help) HELPOPT("display this help text") \
     NOVAL(VERSION) SHORT(V) LONG(version) HELPOPT("report version number") \
@@ -408,6 +415,9 @@ int main(int argc, char **argv)
     time_t now = time(NULL);
     time_t textcutoff = now, htmlnewest = now, htmloldest = now;
     int htmlautoagerange = 1;
+    const char *httpserveraddr = NULL;
+    int httpserverport = 0;
+    const char *httpauthdata = NULL;
     int auth = HTTPD_AUTH_MAGIC | HTTPD_AUTH_BASIC;
     int progress = 1;
     struct inclusion_exclusion *inex = NULL;
@@ -608,6 +618,21 @@ int main(int argc, char **argv)
 			htmlautoagerange = 0;
 		    }
 		    break;
+		  case OPT_SERVERADDR:
+		    {
+			char *port;
+			if (optval[0] == '[' &&
+			    (port = strchr(optval, ']')) != NULL)
+			    port++;
+			else
+			    port = optval;
+			port += strcspn(port, ":");
+			if (port)
+			    *port++ = '\0';
+			httpserveraddr = optval;
+			httpserverport = atoi(port);
+		    }
+		    break;
 		  case OPT_AUTH:
 		    if (!strcmp(optval, "magic"))
 			auth = HTTPD_AUTH_MAGIC;
@@ -636,6 +661,51 @@ int main(int argc, char **argv)
 				" 'basic', 'none', 'default'\n",
 				PNAME, optval, (int)strlen(PNAME), "");
 			return 1;
+		    }
+		    break;
+		  case OPT_AUTHFILE:
+		  case OPT_AUTHFD:
+		    {
+			int fd;
+			char namebuf[40];
+			const char *name;
+			char *authbuf;
+			int authlen, authsize;
+			int ret;
+
+			if (optid == OPT_AUTHFILE) {
+			    fd = open(optval, O_RDONLY);
+			    if (fd < 0) {
+				fprintf(stderr, "%s: %s: open: %s\n", PNAME,
+					optval, strerror(errno));
+				return 1;
+			    }
+			    name = optval;
+			} else {
+			    fd = atoi(optval);
+			    name = namebuf;
+			    sprintf(namebuf, "fd %d", fd);
+			}
+
+			authlen = 0;
+			authsize = 256;
+			authbuf = snewn(authsize, char);
+			while ((ret = read(fd, authbuf+authlen,
+					   authsize-authlen)) > 0) {
+			    authlen += ret;
+			    if ((authsize - authlen) < (authsize / 16)) {
+				authsize = authlen * 3 / 2 + 4096;
+				authbuf = sresize(authbuf, authsize, char);
+			    }
+			}
+			if (ret < 0) {
+			    fprintf(stderr, "%s: %s: read: %s\n", PNAME,
+				    name, strerror(errno));
+			    return 1;
+			}
+			if (optid == OPT_AUTHFILE)
+			    close(fd);
+			httpauthdata = authbuf;
 		    }
 		    break;
 		  case OPT_INCLUDE:
@@ -865,7 +935,8 @@ int main(int argc, char **argv)
 	}
 	triewalk_free(tw);
     } else if (mode == HTTPD) {
-	struct html_config cfg;
+	struct html_config pcfg;
+	struct httpd_config dcfg;
 
 	fd = open(filename, O_RDONLY);
 	if (fd < 0) {
@@ -884,11 +955,14 @@ int main(int argc, char **argv)
 	    return 1;
 	}
 
-	cfg.format = NULL;
-	cfg.autoage = htmlautoagerange;
-	cfg.oldest = htmloldest;
-	cfg.newest = htmlnewest;
-	run_httpd(mappedfile, auth, &cfg);
+	dcfg.address = httpserveraddr;
+	dcfg.port = httpserverport;
+	dcfg.basicauthdata = httpauthdata;
+	pcfg.format = NULL;
+	pcfg.autoage = htmlautoagerange;
+	pcfg.oldest = htmloldest;
+	pcfg.newest = htmlnewest;
+	run_httpd(mappedfile, auth, &dcfg, &pcfg);
     }
 
     return 0;

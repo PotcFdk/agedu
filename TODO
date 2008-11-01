@@ -3,12 +3,6 @@ TODO list for agedu
 
 Before it's non-embarrassingly releasable:
 
- - add more configurable options
-    + server address in httpd mode
-    + HTTP authentication: specify username and/or password, the
-      latter by at least some means which doesn't involve it showing
-      up in "ps"
-
  - more flexible running modes
     + combined scan+dump mode which doesn't even generate an index
       file (nearly indistinguishable from find(1))
@@ -70,6 +64,8 @@ Before it's non-embarrassingly releasable:
  - man page, licence.
 
 Future directions:
+
+ - IPv6 support in the HTTP server
 
  - run-time configuration in the HTTP server
     * I think this probably works by having a configuration form, or

@@ -417,11 +417,12 @@ static void base64_encode_atom(unsigned char *data, int n, char *out)
 	out[3] = '=';
 }
 
-void run_httpd(const void *t, int authmask, const struct html_config *incfg)
+void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
+	       const struct html_config *incfg)
 {
     int fd;
     int authtype;
-    char *authstring = NULL, authbuf[512];
+    char *authstring = NULL;
     unsigned long ipaddr;
     struct fd *f;
     struct sockaddr_in addr;
@@ -440,13 +441,18 @@ void run_httpd(const void *t, int authmask, const struct html_config *incfg)
 	exit(1);
     }
     addr.sin_family = AF_INET;
-    srand(0L);
-    ipaddr = 0x7f000000;
-    ipaddr += (1 + rand() % 255) << 16;
-    ipaddr += (1 + rand() % 255) << 8;
-    ipaddr += (1 + rand() % 255);
-    addr.sin_addr.s_addr = htonl(ipaddr);
-    addr.sin_port = htons(0);
+    if (!dcfg->address) {
+	srand(0L);
+	ipaddr = 0x7f000000;
+	ipaddr += (1 + rand() % 255) << 16;
+	ipaddr += (1 + rand() % 255) << 8;
+	ipaddr += (1 + rand() % 255);
+	addr.sin_addr.s_addr = htonl(ipaddr);
+	addr.sin_port = htons(0);
+    } else {
+	addr.sin_addr.s_addr = inet_addr(dcfg->address);
+	addr.sin_port = dcfg->port ? htons(dcfg->port) : 80;
+    }
     addrlen = sizeof(addr);
     if (bind(fd, (struct sockaddr *)&addr, addrlen) < 0) {
 	fprintf(stderr, "bind: %s\n", strerror(errno));
@@ -464,73 +470,98 @@ void run_httpd(const void *t, int authmask, const struct html_config *incfg)
     if ((authmask & HTTPD_AUTH_MAGIC) &&
 	(check_owning_uid(fd, 1) == getuid())) {
 	authtype = HTTPD_AUTH_MAGIC;
-	printf("Using Linux /proc/net magic authentication\n");
+	if (authmask != HTTPD_AUTH_MAGIC)
+	    printf("Using Linux /proc/net magic authentication\n");
     } else if ((authmask & HTTPD_AUTH_BASIC)) {
-	char username[128], password[128], userpass[259];
+	char username[128], password[128], userpassbuf[259];
+	const char *userpass;
 	const char *rname;
 	unsigned char passbuf[10];
 	int i, j, k, fd;
 
 	authtype = HTTPD_AUTH_BASIC;
 
-	sprintf(username, "agedu");
-	rname = "/dev/urandom";
-	fd = open(rname, O_RDONLY);
-	if (fd < 0) {
-	    int err = errno;
-	    rname = "/dev/random";
+	if (authmask != HTTPD_AUTH_BASIC)
+	    printf("Using HTTP Basic authentication\n");
+
+	if (dcfg->basicauthdata) {
+	    userpass = dcfg->basicauthdata;
+	} else {
+	    sprintf(username, "agedu");
+	    rname = "/dev/urandom";
 	    fd = open(rname, O_RDONLY);
 	    if (fd < 0) {
-		int err2 = errno;
-		fprintf(stderr, "/dev/urandom: open: %s\n", strerror(err));
-		fprintf(stderr, "/dev/random: open: %s\n", strerror(err2));
-		exit(1);
+		int err = errno;
+		rname = "/dev/random";
+		fd = open(rname, O_RDONLY);
+		if (fd < 0) {
+		    int err2 = errno;
+		    fprintf(stderr, "/dev/urandom: open: %s\n", strerror(err));
+		    fprintf(stderr, "/dev/random: open: %s\n", strerror(err2));
+		    exit(1);
+		}
 	    }
-	}
-	for (i = 0; i < 10 ;) {
-	    j = read(fd, passbuf + i, 10 - i);
-	    if (j <= 0) {
-		fprintf(stderr, "%s: read: %s\n", rname,
-			j < 0 ? strerror(errno) : "unexpected EOF");
-		exit(1);
+	    for (i = 0; i < 10 ;) {
+		j = read(fd, passbuf + i, 10 - i);
+		if (j <= 0) {
+		    fprintf(stderr, "%s: read: %s\n", rname,
+			    j < 0 ? strerror(errno) : "unexpected EOF");
+		    exit(1);
+		}
+		i += j;
 	    }
-	    i += j;
+	    close(fd);
+	    for (i = 0; i < 16; i++) {
+		/*
+		 * 32 characters out of the 36 alphanumerics gives
+		 * me the latitude to discard i,l,o for being too
+		 * numeric-looking, and w because it has two too
+		 * many syllables and one too many presidential
+		 * associations.
+		 */
+		static const char chars[32] =
+		    "0123456789abcdefghjkmnpqrstuvxyz";
+		int v = 0;
+
+		k = i / 8 * 5;
+		for (j = 0; j < 5; j++)
+		    v |= ((passbuf[k+j] >> (i%8)) & 1) << j;
+
+		password[i] = chars[v];
+	    }
+	    password[i] = '\0';
+
+	    sprintf(userpassbuf, "%s:%s", username, password);
+	    userpass = userpassbuf;
+
+	    printf("Username: %s\nPassword: %s\n", username, password);
 	}
-	close(fd);
-	for (i = 0; i < 16; i++) {
-	    /* 32 characters out of the 36 alphanumerics gives me the
-	     * latitude to discard i,l,o for being too numeric-looking,
-	     * and w because it has two too many syllables and one too
-	     * many presidential associations. */
-	    static const char chars[32] = "0123456789abcdefghjkmnpqrstuvxyz";
-	    int v = 0;
 
-	    k = i / 8 * 5;
-	    for (j = 0; j < 5; j++)
-		v |= ((passbuf[k+j] >> (i%8)) & 1) << j;
-
-	    password[i] = chars[v];
-	}
-	password[i] = '\0';
-
-	printf("Using HTTP Basic authentication\nUsername: %s\nPassword: %s\n",
-	       username, password);
-
-	k = sprintf(userpass, "%s:%s", username, password);
+	k = strlen(userpass);
+	authstring = snewn(k * 4 / 3 + 16, char);
 	for (i = j = 0; i < k ;) {
 	    int s = k-i < 3 ? k-i : 3;
-	    base64_encode_atom((unsigned char *)(userpass+i), s, authbuf+j);
+	    base64_encode_atom((unsigned char *)(userpass+i), s, authstring+j);
 	    i += s;
 	    j += 4;
 	}
-	authbuf[j] = '\0';
-	authstring = authbuf;
-    } else {
+	authstring[j] = '\0';
+    } else if ((authmask & HTTPD_AUTH_NONE)) {
 	authtype = HTTPD_AUTH_NONE;
-	printf("Web server is unauthenticated\n");
+	if (authmask != HTTPD_AUTH_NONE)
+	    printf("Web server is unauthenticated\n");
+    } else {
+	fprintf(stderr, "agedu: authentication method not supported\n");
+	exit(1);
     }
-    printf("URL: http://%s:%d/\n",
-	   inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+    if (!dcfg->address) {
+	if (ntohs(addr.sin_port) == 80) {
+	    printf("URL: http://%s/\n", inet_ntoa(addr.sin_addr));
+	} else {
+	    printf("URL: http://%s:%d/\n",
+		   inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+	}
+    }
 
     /*
      * Now construct an fd structure to hold it.

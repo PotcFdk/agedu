@@ -185,9 +185,6 @@ static void text_query(const void *mappedfile, const char *querydir,
     if (s1 == s2)
 	return;			       /* no space taken up => no display */
 
-    /* Display in units of 1Kb */
-    printf("%-11llu %s\n", (s2 - s1) / 1024, querydir);
-
     if (depth > 0) {
 	/*
 	 * Now scan for first-level subdirectories and report
@@ -201,6 +198,9 @@ static void text_query(const void *mappedfile, const char *querydir,
 	    xi1 = trie_before(mappedfile, pathbuf);
 	}
     }
+
+    /* Display in units of 1Kb */
+    printf("%-11llu %s\n", (s2 - s1) / 1024, querydir);
 }
 
 /*
@@ -302,6 +302,8 @@ static void text_query(const void *mappedfile, const char *querydir,
         HELPARG("wildcard") HELPOPT("[--scan] prune files matching pattern") \
     VAL(PRUNEPATH) LONG(prune_path) \
         HELPARG("wildcard") HELPOPT("[--scan] prune pathnames matching pattern") \
+    VAL(TQDEPTH) LONG(depth) LONG(max_depth) LONG(maximum_depth) \
+        HELPARG("levels") HELPOPT("[--text] recurse to this many levels") \
     VAL(MINAGE) SHORT(a) LONG(age) LONG(min_age) LONG(minimum_age) \
         HELPARG("age") HELPOPT("[--text] include only files older than this") \
     VAL(AGERANGE) SHORT(r) LONG(age_range) LONG(range) LONG(ages) \
@@ -459,6 +461,7 @@ int main(int argc, char **argv)
     struct inclusion_exclusion *inex = NULL;
     int ninex = 0, inexsize = 0;
     int crossfs = 0;
+    int tqdepth = 1;
 
 #ifdef DEBUG_MAD_OPTION_PARSING_MACROS
     {
@@ -683,6 +686,9 @@ int main(int argc, char **argv)
 		    break;
 		  case OPT_DATAFILE:
 		    filename = optval;
+		    break;
+		  case OPT_TQDEPTH:
+		    tqdepth = atoi(optval);
 		    break;
 		  case OPT_MINAGE:
 		    textcutoff = parse_age(now, optval);
@@ -1046,7 +1052,7 @@ int main(int argc, char **argv)
 	    if (pathlen > 0 && querydir[pathlen-1] == pathsep)
 		querydir[--pathlen] = '\0';
 
-	    text_query(mappedfile, querydir, textcutoff, 1);
+	    text_query(mappedfile, querydir, textcutoff, tqdepth);
 	} else if (mode == HTML) {
 	    char *querydir = actions[action].arg;
 	    size_t pathlen;

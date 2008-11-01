@@ -153,6 +153,9 @@ static void text_query(const void *mappedfile, const char *querydir,
     s1 = index_query(mappedfile, xi1, t);
     s2 = index_query(mappedfile, xi2, t);
 
+    if (s1 == s2)
+	return;			       /* no space taken up => no display */
+
     /* Display in units of 2 512-byte blocks = 1Kb */
     printf("%-11llu %s\n", (s2 - s1) / 2, querydir);
 

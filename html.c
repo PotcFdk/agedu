@@ -321,11 +321,20 @@ static void write_report_line(struct html *ctx, struct vector *vec)
     int i;
 
     /*
-     * Prevent divisions by zero.
+     * A line with literally zero space usage should not be
+     * printed at all if it's a link to a subdirectory (since it
+     * probably means the whole thing was excluded by some
+     * --exclude-path wildcard). If it's [files] or the top-level
+     * line, though, we must always print _something_, and in that
+     * case we must fiddle about to prevent divisions by zero in
+     * the code below.
      */
+    if (!vec->sizes[MAXCOLOUR] && vec->want_href)
+	return;
     divisor = ctx->totalsize;
-    if (!divisor)
+    if (!divisor) {
 	divisor = 1;
+    }
 
     /*
      * Find the total size of this subdirectory.

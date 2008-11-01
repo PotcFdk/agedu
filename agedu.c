@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
+#include <assert.h>
 
 #include <unistd.h>
 #include <sys/types.h>
@@ -113,7 +114,7 @@ static int gotdata(void *vctx, const char *pathname, const struct stat64 *st)
     return 1;
 }
 
-static void text_query(const void *mappedfile, const char *rootdir,
+static void text_query(const void *mappedfile, const char *querydir,
 		       time_t t, int depth)
 {
     size_t maxpathlen;
@@ -129,8 +130,8 @@ static void text_query(const void *mappedfile, const char *rootdir,
      * (inclusive) and that filename with a ^A on the end
      * (exclusive). So find the x indices for each.
      */
-    sprintf(pathbuf, "%s\001", rootdir);
-    xi1 = trie_before(mappedfile, rootdir);
+    sprintf(pathbuf, "%s\001", querydir);
+    xi1 = trie_before(mappedfile, querydir);
     xi2 = trie_before(mappedfile, pathbuf);
 
     /*
@@ -140,7 +141,7 @@ static void text_query(const void *mappedfile, const char *rootdir,
     s2 = index_query(mappedfile, xi2, t);
 
     /* Display in units of 2 512-byte blocks = 1Kb */
-    printf("%-11llu %s\n", (s2 - s1) / 2, rootdir);
+    printf("%-11llu %s\n", (s2 - s1) / 2, querydir);
 
     if (depth > 0) {
 	/*
@@ -176,7 +177,9 @@ static void text_query(const void *mappedfile, const char *rootdir,
  *    parallel to both of the above giving the logical option id
  *    for each physical short and long option
  *  - define an array indexed by logical option id indicating
- *    whether the option in question takes a value.
+ *    whether the option in question takes a value
+ *  - define a function which prints out brief online help for all
+ *    the options.
  *
  * It's not at all clear to me that this trickery is actually
  * particularly _efficient_ - it still, after all, requires going
@@ -197,11 +200,11 @@ static void text_query(const void *mappedfile, const char *rootdir,
  * complete language. I said it was largely frivolous :-)
  *
  * This approach does have the virtue that it brings together the
- * option ids and option spellings into a single combined list and
- * defines them all in exactly one place. If I want to add a new
- * option, or a new spelling for an option, I only have to modify
- * the main OPTIONS macro below and then add code to process the
- * new logical id.
+ * option ids, option spellings and help text into a single
+ * combined list and defines them all in exactly one place. If I
+ * want to add a new option, or a new spelling for an option, I
+ * only have to modify the main OPTHELP macro below and then add
+ * code to process the new logical id.
  *
  * (Though, really, even that isn't ideal, since it still involves
  * modifying the source file in more than one place. In a
@@ -212,29 +215,50 @@ static void text_query(const void *mappedfile, const char *rootdir,
  * need to specify them manually in another part of the code.)
  */
 
-#define OPTIONS(NOVAL, VAL, SHORT, LONG) \
-    NOVAL(HELP) SHORT(h) LONG(help) \
-    NOVAL(VERSION) SHORT(V) LONG(version) \
-    NOVAL(LICENCE) LONG(licence) LONG(license) \
-    NOVAL(SCAN) SHORT(s) LONG(scan) \
-    NOVAL(DUMP) SHORT(d) LONG(dump) \
-    NOVAL(TEXT) SHORT(t) LONG(text) \
-    NOVAL(HTML) SHORT(H) LONG(html) \
+#define OPTHELP(NOVAL, VAL, SHORT, LONG, HELPPFX, HELPARG, HELPLINE, HELPOPT) \
+    HELPPFX("usage") HELPLINE("agedu [options] action") \
+    HELPPFX("actions") \
+    VAL(SCAN) SHORT(s) LONG(scan) \
+	HELPARG("directory") HELPOPT("scan and index a directory") \
+    NOVAL(DUMP) SHORT(d) LONG(dump) HELPOPT("dump the index file") \
+    VAL(TEXT) SHORT(t) LONG(text) \
+	HELPARG("subdir") HELPOPT("print a plain text report on a subdirectory") \
+    VAL(HTML) SHORT(H) LONG(html) \
+	HELPARG("subdir") HELPOPT("print an HTML report on a subdirectory") \
     NOVAL(HTTPD) SHORT(w) LONG(web) LONG(server) LONG(httpd) \
+        HELPOPT("serve reports from a temporary web server") \
+    HELPPFX("options") \
+    VAL(DATAFILE) SHORT(f) LONG(file) \
+        HELPARG("filename") HELPOPT("[all modes] specify index file") \
     NOVAL(PROGRESS) LONG(progress) LONG(scan_progress) \
+        HELPOPT("[--scan] report progress on stderr") \
     NOVAL(NOPROGRESS) LONG(no_progress) LONG(no_scan_progress) \
+        HELPOPT("[--scan] do not report progress") \
     NOVAL(TTYPROGRESS) LONG(tty_progress) LONG(tty_scan_progress) \
 		       LONG(progress_tty) LONG(scan_progress_tty) \
+        HELPOPT("[--scan] report progress if stderr is a tty") \
     NOVAL(CROSSFS) LONG(cross_fs) \
+        HELPOPT("[--scan] cross filesystem boundaries") \
     NOVAL(NOCROSSFS) LONG(no_cross_fs) \
-    VAL(DATAFILE) SHORT(f) LONG(file) \
+        HELPOPT("[--scan] stick to one filesystem") \
+    VAL(INCLUDE) LONG(include) \
+        HELPARG("wildcard") HELPOPT("[--scan] include files matching pattern") \
+    VAL(INCLUDEPATH) LONG(include_path) \
+        HELPARG("wildcard") HELPOPT("[--scan] include pathnames matching pattern") \
+    VAL(EXCLUDE) LONG(exclude) \
+        HELPARG("wildcard") HELPOPT("[--scan] exclude files matching pattern") \
+    VAL(EXCLUDEPATH) LONG(exclude_path) \
+        HELPARG("wildcard") HELPOPT("[--scan] exclude pathnames matching pattern") \
     VAL(MINAGE) SHORT(a) LONG(age) LONG(min_age) LONG(minimum_age) \
+        HELPARG("age") HELPOPT("[--text] include only files older than this") \
     VAL(AUTH) LONG(auth) LONG(http_auth) LONG(httpd_auth) \
               LONG(server_auth) LONG(web_auth) \
-    VAL(INCLUDE) LONG(include) \
-    VAL(INCLUDEPATH) LONG(include_path) \
-    VAL(EXCLUDE) LONG(exclude) \
-    VAL(EXCLUDEPATH) LONG(exclude_path)
+        HELPARG("type") HELPOPT("[--web] specify HTTP authentication method") \
+    HELPPFX("also") \
+    NOVAL(HELP) SHORT(h) LONG(help) HELPOPT("display this help text") \
+    NOVAL(VERSION) SHORT(V) LONG(version) HELPOPT("report version number") \
+    NOVAL(LICENCE) LONG(licence) LONG(license) \
+        HELPOPT("display (MIT) licence text") \
 
 #define IGNORE(x)
 #define DEFENUM(x) OPT_ ## x,
@@ -251,6 +275,9 @@ static void text_query(const void *mappedfile, const char *rootdir,
 #define LONGOPTVAL(x) LONGVAL_ ## x,
 #define LONGTMP(x) SHORTtmp3_ ## x,
 
+#define OPTIONS(NOVAL, VAL, SHORT, LONG) \
+    OPTHELP(NOVAL, VAL, SHORT, LONG, IGNORE, IGNORE, IGNORE, IGNORE)
+
 enum { OPTIONS(DEFENUM,DEFENUM,IGNORE,IGNORE) NOPTIONS };
 enum { OPTIONS(IGNORE,IGNORE,SHORTTMP,IGNORE) NSHORTOPTS };
 enum { OPTIONS(IGNORE,IGNORE,IGNORE,LONGTMP) NLONGOPTS };
@@ -261,6 +288,46 @@ enum { OPTIONS(SHORTNEWOPT,SHORTNEWOPT,SHORTTHISOPT,IGNORE) };
 enum { OPTIONS(LONGNEWOPT,LONGNEWOPT,IGNORE,LONGTHISOPT) };
 static const int shortvals[] = {OPTIONS(IGNORE,IGNORE,SHORTOPTVAL,IGNORE)};
 static const int longvals[] = {OPTIONS(IGNORE,IGNORE,IGNORE,LONGOPTVAL)};
+
+static void usage(FILE *fp)
+{
+    char longbuf[80];
+    const char *prefix, *shortopt, *longopt, *optarg;
+    int i, optex;
+
+#define HELPRESET prefix = shortopt = longopt = optarg = NULL, optex = -1
+#define HELPNOVAL(s) optex = 0;
+#define HELPVAL(s) optex = 1;
+#define HELPSHORT(s) if (!shortopt) shortopt = "-" #s;
+#define HELPLONG(s) if (!longopt) { \
+    strcpy(longbuf, "--" #s); longopt = longbuf; \
+    for (i = 0; longbuf[i]; i++) if (longbuf[i] == '_') longbuf[i] = '-'; }
+#define HELPPFX(s) prefix = s;
+#define HELPARG(s) optarg = s;
+#define HELPLINE(s) assert(optex == -1); \
+    fprintf(fp, "%7s%c %s\n", prefix?prefix:"", prefix?':':' ', s); \
+    HELPRESET;
+#define HELPOPT(s) assert((optex == 1 && optarg) || (optex == 0 && !optarg)); \
+    assert(shortopt || longopt); \
+    i = fprintf(fp, "%7s%c %s%s%s%s%s", prefix?prefix:"", prefix?':':' ', \
+        shortopt?shortopt:"", shortopt&&longopt?", ":"", longopt?longopt:"", \
+	optarg?" ":"", optarg?optarg:""); \
+    fprintf(fp, "%*s %s\n", i<32?32-i:0,"",s); HELPRESET;
+
+    HELPRESET;
+    OPTHELP(HELPNOVAL, HELPVAL, HELPSHORT, HELPLONG,
+	    HELPPFX, HELPARG, HELPLINE, HELPOPT);
+
+#undef HELPRESET
+#undef HELPNOVAL
+#undef HELPVAL
+#undef HELPSHORT
+#undef HELPLONG
+#undef HELPPFX
+#undef HELPARG
+#undef HELPLINE
+#undef HELPOPT
+}
 
 int main(int argc, char **argv)
 {
@@ -273,7 +340,8 @@ int main(int argc, char **argv)
     indexbuild *ib;
     const struct trie_file *tf;
     char *filename = "agedu.dat";
-    char *rootdir = NULL;
+    char *scandir = NULL;
+    char *querydir = NULL;
     int doing_opts = 1;
     enum { USAGE, TEXT, HTML, SCAN, DUMP, HTTPD } mode = USAGE;
     char *minage = "0d";
@@ -418,7 +486,7 @@ int main(int argc, char **argv)
 		 */
 		switch (optid) {
 		  case OPT_HELP:
-		    printf("FIXME: usage();\n");
+		    usage(stdout);
 		    return 0;
 		  case OPT_VERSION:
 		    printf("FIXME: version();\n");
@@ -428,15 +496,18 @@ int main(int argc, char **argv)
 		    return 0;
 		  case OPT_SCAN:
 		    mode = SCAN;
+		    scandir = optval;
 		    break;
 		  case OPT_DUMP:
 		    mode = DUMP;
 		    break;
 		  case OPT_TEXT:
+		    querydir = optval;
 		    mode = TEXT;
 		    break;
 		  case OPT_HTML:
 		    mode = HTML;
+		    querydir = optval;
 		    break;
 		  case OPT_HTTPD:
 		    mode = HTTPD;
@@ -498,21 +569,14 @@ int main(int argc, char **argv)
 		}
 	    }
         } else {
-	    if (!rootdir) {
-		rootdir = p;
-	    } else {
-		fprintf(stderr, "%s: unexpected argument '%s'\n", PNAME, p);
-		return 1;
-	    }
+	    fprintf(stderr, "%s: unexpected argument '%s'\n", PNAME, p);
+	    return 1;
         }
     }
 
-    if (!rootdir)
-	rootdir = ".";
-
     if (mode == USAGE) {
-	printf("FIXME: usage();\n");
-	return 0;
+	usage(stderr);
+	return 1;
     } else if (mode == SCAN) {
 
 	fd = open(filename, O_RDWR | O_TRUNC | O_CREAT, S_IRWXU);
@@ -522,8 +586,8 @@ int main(int argc, char **argv)
 	    return 1;
 	}
 
-	if (stat(rootdir, &st) < 0) {
-	    fprintf(stderr, "%s: %s: stat: %s\n", PNAME, rootdir,
+	if (stat(scandir, &st) < 0) {
+	    fprintf(stderr, "%s: %s: stat: %s\n", PNAME, scandir,
 		    strerror(errno));
 	    return 1;
 	}
@@ -558,7 +622,7 @@ int main(int argc, char **argv)
 	 * of the data file.
 	 */
 	ctx->tb = triebuild_new(fd);
-	du(rootdir, gotdata, ctx);
+	du(scandir, gotdata, ctx);
 	count = triebuild_finish(ctx->tb);
 	triebuild_free(ctx->tb);
 
@@ -667,11 +731,11 @@ int main(int argc, char **argv)
 	/*
 	 * Trim trailing slash, just in case.
 	 */
-	pathlen = strlen(rootdir);
-	if (pathlen > 0 && rootdir[pathlen-1] == '/')
-	    rootdir[--pathlen] = '\0';
+	pathlen = strlen(querydir);
+	if (pathlen > 0 && querydir[pathlen-1] == '/')
+	    querydir[--pathlen] = '\0';
 
-	text_query(mappedfile, rootdir, t, 1);
+	text_query(mappedfile, querydir, t, 1);
     } else if (mode == HTML) {
 	size_t pathlen;
 	unsigned long xi;
@@ -697,11 +761,11 @@ int main(int argc, char **argv)
 	/*
 	 * Trim trailing slash, just in case.
 	 */
-	pathlen = strlen(rootdir);
-	if (pathlen > 0 && rootdir[pathlen-1] == '/')
-	    rootdir[--pathlen] = '\0';
+	pathlen = strlen(querydir);
+	if (pathlen > 0 && querydir[pathlen-1] == '/')
+	    querydir[--pathlen] = '\0';
 
-	xi = trie_before(mappedfile, rootdir);
+	xi = trie_before(mappedfile, querydir);
 	html = html_query(mappedfile, xi, NULL);
 	fputs(html, stdout);
     } else if (mode == DUMP) {

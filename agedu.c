@@ -970,6 +970,7 @@ int main(int argc, char **argv)
 			    p++;
 			    c = 0;
 			    for (i = 0; i < 2; i++) {
+				c *= 16;
 				if (*p >= '0' && *p <= '9')
 				    c += *p - '0';
 				else if (*p >= 'A' && *p <= 'F')
@@ -989,6 +990,7 @@ int main(int argc, char **argv)
 		    *q = '\0';
 		    triebuild_add(ctx->tb, buf, &tf);
 		    sfree(buf);
+		    line++;
 		}
 	    } else {
 		du(scandir, gotdata, ctx);

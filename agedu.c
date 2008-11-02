@@ -262,6 +262,10 @@ static void text_query(const void *mappedfile, const char *querydir,
  * not bother defining logical identifiers for them at all - those
  * would be automatically generated, since I wouldn't have any
  * need to specify them manually in another part of the code.)
+ *
+ * One other helpful consequence of the enum-based structure here
+ * is that it causes a compiler error if I accidentally try to
+ * define the same option (short or long) twice.
  */
 
 #define OPTHELP(NOVAL, VAL, SHORT, LONG, HELPPFX, HELPARG, HELPLINE, HELPOPT) \
@@ -269,10 +273,10 @@ static void text_query(const void *mappedfile, const char *querydir,
     HELPPFX("actions") \
     VAL(SCAN) SHORT(s) LONG(scan) \
 	HELPARG("directory") HELPOPT("scan and index a directory") \
-    NOVAL(DUMP) SHORT(d) LONG(dump) HELPOPT("dump the index file on stdout") \
+    NOVAL(DUMP) SHORT(D) LONG(dump) HELPOPT("dump the index file on stdout") \
     VAL(SCANDUMP) SHORT(S) LONG(scan_dump) \
 	HELPARG("directory") HELPOPT("scan only, generating a dump") \
-    NOVAL(LOAD) SHORT(l) LONG(load) \
+    NOVAL(LOAD) SHORT(L) LONG(load) \
 	HELPOPT("load and index a dump file") \
     VAL(TEXT) SHORT(t) LONG(text) \
 	HELPARG("subdir") HELPOPT("print a plain text report on a subdirectory") \
@@ -282,7 +286,7 @@ static void text_query(const void *mappedfile, const char *querydir,
         HELPOPT("serve HTML reports from a temporary web server") \
     HELPPFX("options") \
     VAL(DATAFILE) SHORT(f) LONG(file) \
-        HELPARG("filename") HELPOPT("[all modes] specify index file") \
+        HELPARG("filename") HELPOPT("[most modes] specify index file") \
     NOVAL(PROGRESS) LONG(progress) LONG(scan_progress) \
         HELPOPT("[--scan] report progress on stderr") \
     NOVAL(NOPROGRESS) LONG(no_progress) LONG(no_scan_progress) \
@@ -310,7 +314,7 @@ static void text_query(const void *mappedfile, const char *querydir,
         HELPOPT("[--scan] keep real atimes on directories") \
     NOVAL(NODIRATIME) LONG(no_dir_atime) LONG(no_dir_atimes) \
         HELPOPT("[--scan] fake atimes on directories") \
-    VAL(TQDEPTH) LONG(depth) LONG(max_depth) LONG(maximum_depth) \
+    VAL(TQDEPTH) SHORT(d) LONG(depth) LONG(max_depth) LONG(maximum_depth) \
         HELPARG("levels") HELPOPT("[--text] recurse to this many levels") \
     VAL(MINAGE) SHORT(a) LONG(age) LONG(min_age) LONG(minimum_age) \
         HELPARG("age") HELPOPT("[--text] include only files older than this") \

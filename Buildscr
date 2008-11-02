@@ -10,9 +10,10 @@ in agedu do aclocal
 in agedu do autoconf
 in agedu do autoheader
 in agedu do automake -a --foreign
+in agedu do rm -rf autom4te.cache
 
 in . do cp -R agedu agedu-r$(revision)
 in . do rm agedu-r$(revision)/GNUmakefile
-in . do tar czvf agedu-r$(revision).tar.gz agedu-r$(revision)
+in . do tar chzvf agedu-r$(revision).tar.gz agedu-r$(revision)
 
 deliver agedu-r$(revision).tar.gz $@

@@ -8,7 +8,7 @@
 
 #include "trie.h"
 #include "index.h"
-#include "malloc.h"
+#include "alloc.h"
 
 #define alignof(typ) ( offsetof(struct { char c; typ t; }, t) )
 

@@ -1,9 +1,9 @@
 /*
- * malloc.h: safe wrappers around malloc, realloc, free, strdup
+ * alloc.h: safe wrappers around malloc, realloc, free, strdup
  */
 
-#ifndef AGEDU_MALLOC_H
-#define AGEDU_MALLOC_H
+#ifndef AGEDU_ALLOC_H
+#define AGEDU_ALLOC_H
 
 #include <stddef.h>
 
@@ -72,4 +72,4 @@ char *dupfmt(const char *fmt, ...);
     ( (void)sizeof((array)-(type *)0), \
       (type *) srealloc ((array), (number) * sizeof (type)) )
 
-#endif /* AGEDU_MALLOC_H */
+#endif /* AGEDU_ALLOC_H */

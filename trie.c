@@ -12,7 +12,7 @@
 #include <unistd.h>
 
 #include "agedu.h"
-#include "malloc.h"
+#include "alloc.h"
 #include "trie.h"
 
 #define alignof(typ) ( offsetof(struct { char c; typ t; }, t) )

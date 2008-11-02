@@ -1,5 +1,5 @@
 /*
- * malloc.c: implementation of malloc.h
+ * alloc.c: implementation of alloc.h
  */
 
 #include <stdlib.h>
@@ -10,7 +10,7 @@
 #include <stdio.h>
 
 #include "agedu.h"
-#include "malloc.h"
+#include "alloc.h"
 
 extern void fatal(const char *, ...);
 

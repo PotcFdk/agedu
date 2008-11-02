@@ -24,7 +24,7 @@
 #include "du.h"
 #include "trie.h"
 #include "index.h"
-#include "malloc.h"
+#include "alloc.h"
 #include "html.h"
 #include "httpd.h"
 #include "fgetline.h"

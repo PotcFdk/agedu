@@ -15,7 +15,7 @@
 #include <unistd.h>
 
 #include "du.h"
-#include "malloc.h"
+#include "alloc.h"
 
 #ifdef __linux__
 

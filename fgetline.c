@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "malloc.h"
+#include "alloc.h"
 #include "fgetline.h"
 
 char *fgetline(FILE *fp)

@@ -13,7 +13,7 @@
 
 #include "agedu.h"
 #include "html.h"
-#include "malloc.h"
+#include "alloc.h"
 #include "trie.h"
 #include "index.h"
 

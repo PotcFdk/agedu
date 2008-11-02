@@ -21,7 +21,7 @@
 #include <syslog.h>
 
 #include "agedu.h"
-#include "malloc.h"
+#include "alloc.h"
 #include "html.h"
 #include "httpd.h"
 

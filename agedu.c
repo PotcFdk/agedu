@@ -284,6 +284,8 @@ static void text_query(const void *mappedfile, const char *querydir,
 	HELPARG("subdir") HELPOPT("print an HTML report on a subdirectory") \
     NOVAL(HTTPD) SHORT(w) LONG(web) LONG(server) LONG(httpd) \
         HELPOPT("serve HTML reports from a temporary web server") \
+    NOVAL(REMOVE) SHORT(R) LONG(remove) LONG(delete) LONG(unlink) \
+        HELPOPT("remove the index file") \
     HELPPFX("options") \
     VAL(DATAFILE) SHORT(f) LONG(file) \
         HELPARG("filename") HELPOPT("[most modes] specify index file") \
@@ -456,7 +458,7 @@ int main(int argc, char **argv)
     const struct trie_file *tf;
     char *filename = PNAME ".dat";
     int doing_opts = 1;
-    enum { TEXT, HTML, SCAN, DUMP, SCANDUMP, LOAD, HTTPD };
+    enum { TEXT, HTML, SCAN, DUMP, SCANDUMP, LOAD, HTTPD, REMOVE };
     struct action {
 	int mode;
 	char *arg;
@@ -687,6 +689,15 @@ int main(int argc, char **argv)
 			actions = sresize(actions, actionsize, struct action);
 		    }
 		    actions[nactions].mode = HTTPD;
+		    actions[nactions].arg = NULL;
+		    nactions++;
+		    break;
+		  case OPT_REMOVE:
+		    if (nactions >= actionsize) {
+			actionsize = nactions * 3 / 2 + 16;
+			actions = sresize(actions, actionsize, struct action);
+		    }
+		    actions[nactions].mode = REMOVE;
 		    actions[nactions].arg = NULL;
 		    nactions++;
 		    break;
@@ -1188,6 +1199,12 @@ int main(int argc, char **argv)
 	    pcfg.oldest = htmloldest;
 	    pcfg.newest = htmlnewest;
 	    run_httpd(mappedfile, auth, &dcfg, &pcfg);
+	} else if (mode == REMOVE) {
+	    if (remove(filename) < 0) {
+		fprintf(stderr, "%s: %s: remove: %s\n", PNAME, filename,
+			strerror(errno));
+		return 1;
+	    }
 	}
     }
 

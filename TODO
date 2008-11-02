@@ -13,9 +13,6 @@ Before it's non-embarrassingly releasable:
 	    too, if it's available and O_NOATIME is too.
        * what do we do elsewhere about _GNU_SOURCE?
 
- - New mode: --remove, to destroy the data file. Handy for
-   totally self-contained usage: "-s . -w -R".
-
  - man page, --version.
 
 Future possibilities:

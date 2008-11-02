@@ -31,10 +31,6 @@ $(ALLOBJS): %.o: %.c
 	gcc $(CFLAGS) -MM $*.c > $*.d
 	gcc $(CFLAGS) $(INTERNALFLAGS) -c $*.c
 
-install: agedu
-	mkdir -p $(bindir)
-	$(INSTALL) -m 0755 agedu $(bindir)/agedu
-
 clean:
 	rm -f agedu $(ALLOBJS) $(ALLDEPS)
 

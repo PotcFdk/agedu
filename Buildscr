@@ -1,0 +1,18 @@
+# -*- sh -*-
+#
+# bob script to build the agedu tarball.
+
+module agedu
+
+in agedu do sed '/AC_INIT/s/6.66/r$(revision)/' configure.ac > tmp.ac
+in agedu do mv tmp.ac configure.ac
+in agedu do aclocal
+in agedu do autoconf
+in agedu do autoheader
+in agedu do automake -a --foreign
+
+in . do cp -R agedu agedu-r$(revision)
+in . do rm agedu-r$(revision)/GNUmakefile
+in . do tar czvf agedu-r$(revision).tar.gz agedu-r$(revision)
+
+deliver agedu-r$(revision).tar.gz $@

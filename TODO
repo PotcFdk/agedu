@@ -3,19 +3,8 @@ TODO list for agedu
 
 Before it's non-embarrassingly releasable:
 
- - work out what to do about atimes on directories in the absence of
-   the Linux syscall magic
-    * one option is to read them during the scan and reinstate them
-      after each recursion pop. Race-condition prone.
-    * marking them in a distinctive colour in the reports is another
-      option.
-    * a third option is simply to ignore space taken up by
-      directories in the first place; inaccurate but terribly simple.
-    * incidentally, sometimes open(...,O_NOATIME) will fail, and
-      then we have to fall back to ordinary open. Be prepared to do
-      this, which probably means getting rid of the icky macro
-      hackery in du.c and turning it into a more sensible run-time
-      abstraction layer.
+ - arrange to be able to identify directories and leave them on one
+   side of the usual age display
 
  - cross-Unix portability:
     + use autoconf
@@ -54,20 +43,6 @@ Future possibilities:
       straight to terminfo: generate lines of attribute-interleaved
       text and display them, so we only really need the sequences
       "go here and display stuff", "scroll up", "scroll down".
-    + I think the attribute-interleaved text might be possible to do
-      cunningly, as well: we autodetect a basically VT-style
-      terminal, and add 256-colour sequences on the end. So, for
-      instance, we might set ANSI-yellow foreground, set ANSI-red
-      background, _then_ set both foreground and background to the
-      appropriate xterm 256-colour, and then display some
-      appropriate character which would have given the right blend
-      of the ANSI-16 fore and background colours. Then the same
-      display code should gracefully degrade in the face of a
-      terminal which doesn't support xterm-256.
-       * current best plan is to simulate the xterm-256 shading from
-	 0/5 to 5/5 by doing space, colon and hash in colour A on
-	 colour B background, then hash, colon and space in B on A
-	 background.
     + Infrastructure work before doing any of this would be to split
       html.c into two: one part to prepare an abstract data
       structure describing an HTML-like report (in particular, all

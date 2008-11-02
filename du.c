@@ -18,39 +18,123 @@
 #include "malloc.h"
 
 #ifdef __linux__
+
+/*
+ * On Linux, we have the O_NOATIME flag. This means we can read
+ * the contents of directories without affecting their atimes,
+ * which enables us to at least try to include them in the age
+ * display rather than exempting them.
+ *
+ * Unfortunately, opendir() doesn't let us open a directory with
+ * O_NOATIME. In later glibcs we can open one manually using
+ * open() and then use fdopendir() to translate the fd into a
+ * POSIX dir handle; in earlier glibcs fdopendir() is not
+ * available, so we have no option but to talk directly to the
+ * kernel system call interface which underlies the POSIX
+ * opendir/readdir machinery.
+ */
+
 #define __KERNEL__
 #include <unistd.h>
 #include <fcntl.h>
 #include <linux/types.h>
 #include <linux/dirent.h>
 #include <linux/unistd.h>
-typedef int dirhandle;
+
+_syscall3(int, getdents, uint, fd, struct dirent *, dirp, uint, count)
+
 typedef struct {
+    int fd;
     struct dirent data[32];
     struct dirent *curr;
     int pos, endpos;
-} direntry;
-_syscall3(int, getdents, uint, fd, struct dirent *, dirp, uint, count)
-#define OPENDIR(f) open(f, O_RDONLY | O_NOATIME | O_DIRECTORY)
-#define DIRVALID(dh) ((dh) >= 0)
-#define READDIR(dh,de) ((de).curr = (de).data, (de).pos = 0, \
-    ((de).endpos = getdents((dh), (de).data, sizeof((de).data))) > 0)
-#define DENAME(de) ((de).curr->d_name)
-#define DEDONE(de) ((de).pos >= (de).endpos)
-#define DEADVANCE(de) ((de).pos += (de).curr->d_reclen, \
-    (de).curr = (struct dirent *)((char *)(de).data + (de).pos))
-#define CLOSEDIR(dh) close(dh)
-#else
+} dirhandle;
+
+int open_dir(const char *path, dirhandle *dh)
+{
+    dh->fd = open(path, O_RDONLY | O_NOATIME | O_DIRECTORY);
+    if (dh->fd < 0) {
+	/*
+	 * Opening a file with O_NOATIME is not unconditionally
+	 * permitted by the Linux kernel. As far as I can tell,
+	 * it's permitted only for files on which the user would
+	 * have been able to call utime(2): in other words, files
+	 * for which the user could have deliberately set the
+	 * atime back to its original value after finishing with
+	 * it. Hence, O_NOATIME has no security implications; it's
+	 * simply a cleaner, faster and more race-condition-free
+	 * alternative to stat(), a normal open(), and a utimes()
+	 * when finished.
+	 *
+	 * The upshot of all of which, for these purposes, is that
+	 * we must be prepared to try again without O_NOATIME if
+	 * we receive EPERM.
+	 */
+	if (errno == EPERM)
+	    dh->fd = open(path, O_RDONLY | O_DIRECTORY);
+	if (dh->fd < 0)
+	    return -1;
+    }
+
+    dh->pos = dh->endpos = 0;
+
+    return 0;
+}
+
+const char *read_dir(dirhandle *dh)
+{
+    const char *ret;
+
+    if (dh->pos >= dh->endpos) {
+	dh->curr = dh->data;
+	dh->pos = 0;
+	dh->endpos = getdents(dh->fd, dh->data, sizeof(dh->data));
+	if (dh->endpos <= 0)
+	    return NULL;
+    }
+
+    ret = dh->curr->d_name;
+
+    dh->pos += dh->curr->d_reclen;
+    dh->curr = (struct dirent *)((char *)dh->data + dh->pos);
+
+    return ret;
+}
+
+void close_dir(dirhandle *dh)
+{
+    close(dh->fd);
+}
+
+#else /* __linux__ */
+
+/*
+ * This branch of the ifdef is a simple exercise of ordinary POSIX
+ * opendir/readdir.
+ */
+
 #include <dirent.h>
 typedef DIR *dirhandle;
-typedef struct dirent *direntry;
-#define OPENDIR(f) opendir(f)
-#define DIRVALID(dh) ((dh) != NULL)
-#define READDIR(dh,de) (((de) = readdir(dh)) ? 1 : 0)
-#define DENAME(de) ((de)->d_name)
-#define DEDONE(de) ((de) == NULL)
-#define DEADVANCE(de) ((de) = NULL)
-#define CLOSEDIR(dh) closedir(dh)
+
+int open_dir(const char *path, dirhandle *dh)
+{
+    *dh = opendir(path);
+    if (!*dh)
+	return -1;
+    return 0;
+}
+
+const char *read_dir(dirhandle *dh)
+{
+    struct dirent *de = readdir(*dh);
+    return de ? de->d_name : NULL;
+}
+
+void close_dir(dirhandle *dh)
+{
+    closedir(*dh);
+}
+
 #endif
 
 static int str_cmp(const void *av, const void *bv)
@@ -61,7 +145,7 @@ static int str_cmp(const void *av, const void *bv)
 static void du_recurse(char **path, size_t pathlen, size_t *pathsize,
 		       gotdata_fn_t gotdata, void *gotdata_ctx)
 {
-    direntry de;
+    const char *name;
     dirhandle d;
     struct stat64 st;
     char **names;
@@ -81,27 +165,22 @@ static void du_recurse(char **path, size_t pathlen, size_t *pathsize,
     names = NULL;
     nnames = namesize = 0;
 
-    d = OPENDIR(*path);
-    if (!DIRVALID(d)) {
+    if (open_dir(*path, &d) < 0) {
 	fprintf(stderr, "%s: opendir: %s\n", *path, strerror(errno));
 	return;
     }
-    while (READDIR(d, de)) {
-	do {
-	    const char *name = DENAME(de);
-	    if (name[0] == '.' && (!name[1] || (name[1] == '.' && !name[2]))) {
-		/* do nothing - we skip "." and ".." */
-	    } else {
-		if (nnames >= namesize) {
-		    namesize = nnames * 3 / 2 + 64;
-		    names = sresize(names, namesize, char *);
-		}
-		names[nnames++] = dupstr(name);
+    while ((name = read_dir(&d)) != NULL) {
+	if (name[0] == '.' && (!name[1] || (name[1] == '.' && !name[2]))) {
+	    /* do nothing - we skip "." and ".." */
+	} else {
+	    if (nnames >= namesize) {
+		namesize = nnames * 3 / 2 + 64;
+		names = sresize(names, namesize, char *);
 	    }
-	    DEADVANCE(de);
-	} while (!DEDONE(de));
+	    names[nnames++] = dupstr(name);
+	}
     }
-    CLOSEDIR(d);
+    close_dir(&d);
 
     if (nnames == 0)
 	return;

@@ -11,16 +11,13 @@
 #include <limits.h>
 #include <time.h>
 
+#include "agedu.h"
 #include "html.h"
 #include "malloc.h"
 #include "trie.h"
 #include "index.h"
 
-#define lenof(x) ( sizeof((x)) / sizeof(*(x)) )
-
 #define MAXCOLOUR 511
-
-extern char pathsep;
 
 struct html {
     char *buf;

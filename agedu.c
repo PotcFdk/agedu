@@ -20,6 +20,7 @@
 #include <sys/ioctl.h>
 #include <fnmatch.h>
 
+#include "agedu.h"
 #include "du.h"
 #include "trie.h"
 #include "index.h"
@@ -27,10 +28,6 @@
 #include "html.h"
 #include "httpd.h"
 #include "fgetline.h"
-
-#define PNAME "agedu"
-
-#define lenof(x) (sizeof((x))/sizeof(*(x)))
 
 /*
  * Path separator. This global variable affects the behaviour of

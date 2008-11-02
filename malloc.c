@@ -9,9 +9,8 @@
 #include <assert.h>
 #include <stdio.h>
 
+#include "agedu.h"
 #include "malloc.h"
-
-#define lenof(x) (sizeof((x))/sizeof(*(x)))
 
 extern void fatal(const char *, ...);
 

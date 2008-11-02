@@ -11,12 +11,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "agedu.h"
 #include "malloc.h"
 #include "trie.h"
 
 #define alignof(typ) ( offsetof(struct { char c; typ t; }, t) )
-
-extern char pathsep;
 
 /*
  * Compare functions for pathnames. Returns the relative order of

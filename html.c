@@ -425,7 +425,7 @@ char *html_query(const void *t, unsigned long index,
      */
     htprintf(ctx, "<head>\n");
     trie_getpath(t, index, path);
-    htprintf(ctx, "<title>agedu: ");
+    htprintf(ctx, "<title>%s: ", PNAME);
     htescape(ctx, path, strlen(path), 0);
     htprintf(ctx, "</title>\n");
     htprintf(ctx, "</head>\n");

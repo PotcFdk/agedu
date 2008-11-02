@@ -258,7 +258,7 @@ static void text_query(const void *mappedfile, const char *querydir,
  */
 
 #define OPTHELP(NOVAL, VAL, SHORT, LONG, HELPPFX, HELPARG, HELPLINE, HELPOPT) \
-    HELPPFX("usage") HELPLINE("agedu [options] action [action...]") \
+    HELPPFX("usage") HELPLINE(PNAME " [options] action [action...]") \
     HELPPFX("actions") \
     VAL(SCAN) SHORT(s) LONG(scan) \
 	HELPARG("directory") HELPOPT("scan and index a directory") \
@@ -439,7 +439,7 @@ int main(int argc, char **argv)
     triewalk *tw;
     indexbuild *ib;
     const struct trie_file *tf;
-    char *filename = "agedu.dat";
+    char *filename = PNAME ".dat";
     int doing_opts = 1;
     enum { TEXT, HTML, SCAN, DUMP, SCANDUMP, LOAD, HTTPD };
     struct action {
@@ -736,7 +736,7 @@ int main(int argc, char **argv)
 			auth = HTTPD_AUTH_MAGIC | HTTPD_AUTH_BASIC;
 		    else if (!strcmp(optval, "help") ||
 			     !strcmp(optval, "list")) {
-			printf("agedu: supported HTTP authentication types"
+			printf(PNAME ": supported HTTP authentication types"
 			       " are:\n"
 			       "       magic      use Linux /proc/net/tcp to"
 			       " determine owner of peer socket\n"
@@ -845,7 +845,7 @@ int main(int argc, char **argv)
 		char *buf = fgetline(stdin);
 		unsigned newpathsep;
 		buf[strcspn(buf, "\r\n")] = '\0';
-		if (1 != sscanf(buf, "agedu dump file. pathsep=%x",
+		if (1 != sscanf(buf, DUMPHDR "%x",
 				&newpathsep)) {
 		    fprintf(stderr, "%s: header in dump file not recognised\n",
 			    PNAME);
@@ -866,7 +866,7 @@ int main(int argc, char **argv)
 		    return 1;
 		}
 		if (fstat(fd, &st) < 0) {
-		    perror("agedu: fstat");
+		    perror(PNAME ": fstat");
 		    return 1;
 		}
 		ctx->datafile_dev = st.st_dev;
@@ -906,7 +906,7 @@ int main(int argc, char **argv)
 	    }
 
 	    if (mode == SCANDUMP)
-		printf("agedu dump file. pathsep=%02x\n", (unsigned char)pathsep);
+		printf(DUMPHDR "%02x\n", (unsigned char)pathsep);
 
 	    /*
 	     * Scan the directory tree, and write out the trie component
@@ -988,7 +988,7 @@ int main(int argc, char **argv)
 		 * will take; enlarge the file, and memory-map it.
 		 */
 		if (fstat(fd, &st) < 0) {
-		    perror("agedu: fstat");
+		    perror(PNAME ": fstat");
 		    return 1;
 		}
 
@@ -998,11 +998,11 @@ int main(int argc, char **argv)
 		totalsize = index_compute_size(st.st_size, count);
 
 		if (lseek(fd, totalsize-1, SEEK_SET) < 0) {
-		    perror("agedu: lseek");
+		    perror(PNAME ": lseek");
 		    return 1;
 		}
 		if (write(fd, "\0", 1) < 1) {
-		    perror("agedu: write");
+		    perror(PNAME ": write");
 		    return 1;
 		}
 
@@ -1011,7 +1011,7 @@ int main(int argc, char **argv)
 
 		mappedfile = mmap(NULL, totalsize, PROT_READ|PROT_WRITE,MAP_SHARED, fd, 0);
 		if (!mappedfile) {
-		    perror("agedu: mmap");
+		    perror(PNAME ": mmap");
 		    return 1;
 		}
 
@@ -1039,13 +1039,13 @@ int main(int argc, char **argv)
 		return 1;
 	    }
 	    if (fstat(fd, &st) < 0) {
-		perror("agedu: fstat");
+		perror(PNAME ": fstat");
 		return 1;
 	    }
 	    totalsize = st.st_size;
 	    mappedfile = mmap(NULL, totalsize, PROT_READ, MAP_SHARED, fd, 0);
 	    if (!mappedfile) {
-		perror("agedu: mmap");
+		perror(PNAME ": mmap");
 		return 1;
 	    }
 	    pathsep = trie_pathsep(mappedfile);
@@ -1072,13 +1072,13 @@ int main(int argc, char **argv)
 		return 1;
 	    }
 	    if (fstat(fd, &st) < 0) {
-		perror("agedu: fstat");
+		perror(PNAME ": fstat");
 		return 1;
 	    }
 	    totalsize = st.st_size;
 	    mappedfile = mmap(NULL, totalsize, PROT_READ, MAP_SHARED, fd, 0);
 	    if (!mappedfile) {
-		perror("agedu: mmap");
+		perror(PNAME ": mmap");
 		return 1;
 	    }
 	    pathsep = trie_pathsep(mappedfile);
@@ -1108,13 +1108,13 @@ int main(int argc, char **argv)
 		return 1;
 	    }
 	    if (fstat(fd, &st) < 0) {
-		perror("agedu: fstat");
+		perror(PNAME ": fstat");
 		return 1;
 	    }
 	    totalsize = st.st_size;
 	    mappedfile = mmap(NULL, totalsize, PROT_READ, MAP_SHARED, fd, 0);
 	    if (!mappedfile) {
-		perror("agedu: mmap");
+		perror(PNAME ": mmap");
 		return 1;
 	    }
 	    pathsep = trie_pathsep(mappedfile);
@@ -1122,7 +1122,7 @@ int main(int argc, char **argv)
 	    maxpathlen = trie_maxpathlen(mappedfile);
 	    buf = snewn(maxpathlen, char);
 
-	    printf("agedu dump file. pathsep=%02x\n", (unsigned char)pathsep);
+	    printf(DUMPHDR "%02x\n", (unsigned char)pathsep);
 	    tw = triewalk_new(mappedfile);
 	    while ((tf = triewalk_next(tw, buf)) != NULL)
 		dump_line(buf, tf);
@@ -1138,13 +1138,13 @@ int main(int argc, char **argv)
 		return 1;
 	    }
 	    if (fstat(fd, &st) < 0) {
-		perror("agedu: fstat");
+		perror(PNAME ": fstat");
 		return 1;
 	    }
 	    totalsize = st.st_size;
 	    mappedfile = mmap(NULL, totalsize, PROT_READ, MAP_SHARED, fd, 0);
 	    if (!mappedfile) {
-		perror("agedu: mmap");
+		perror(PNAME ": mmap");
 		return 1;
 	    }
 	    pathsep = trie_pathsep(mappedfile);

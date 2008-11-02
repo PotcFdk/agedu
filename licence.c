@@ -1,5 +1,7 @@
+#include "agedu.h"
+
 const char *const licence[] = {
-    "agedu is copyright 2008 Simon Tatham. All rights reserved.\n",
+    PNAME " is copyright 2008 Simon Tatham. All rights reserved.\n",
     "\n",
     "Permission is hereby granted, free of charge, to any person\n",
     "obtaining a copy of this software and associated documentation files\n",

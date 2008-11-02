@@ -156,7 +156,7 @@ static void tb_seek(triebuild *tb, off_t off)
 {
     tb->offset = off;
     if (lseek(tb->fd, off, SEEK_SET) < 0) {
-	fprintf(stderr, "agedu: lseek: %s\n", strerror(errno));
+	fprintf(stderr, PNAME ": lseek: %s\n", strerror(errno));
 	exit(1);
     }
 }
@@ -167,7 +167,7 @@ static void tb_write(triebuild *tb, const void *buf, size_t len)
     while (len > 0) {
 	int ret = write(tb->fd, buf, len);
 	if (ret < 0) {
-	    fprintf(stderr, "agedu: write: %s\n", strerror(errno));
+	    fprintf(stderr, PNAME ": write: %s\n", strerror(errno));
 	    exit(1);
 	}
 	len -= ret;

@@ -20,6 +20,7 @@
 #include <netinet/in.h>
 #include <syslog.h>
 
+#include "agedu.h"
 #include "malloc.h"
 #include "html.h"
 #include "httpd.h"
@@ -66,7 +67,7 @@ static char *http_error(char *code, char *errmsg, char *extraheader,
 {
     return dupfmt("HTTP/1.1 %s %s\r\n"
 		  "Date: %D\r\n"
-		  "Server: agedu\r\n"
+		  "Server: " PNAME "\r\n"
 		  "Connection: close\r\n"
 		  "%s"
 		  "Content-Type: text/html; charset=US-ASCII\r\n"
@@ -87,7 +88,7 @@ static char *http_success(char *mimetype, int stuff_cr, char *document)
     return dupfmt("HTTP/1.1 200 OK\r\n"
 		  "Date: %D\r\n"
 		  "Expires: %D\r\n"
-		  "Server: agedu\r\n"
+		  "Server: " PNAME "\r\n"
 		  "Connection: close\r\n"
 		  "Content-Type: %s\r\n"
 		  "\r\n"
@@ -186,7 +187,7 @@ char *got_data(struct connctx *ctx, char *data, int length,
 	    /* Restore the request to the way we received it. */
 	    *z2 = c2;
 	    *z1 = c1;
-	    text = dupfmt("<code>agedu</code> received the HTTP request"
+	    text = dupfmt("<code>" PNAME "</code> received the HTTP request"
 			  " \"<code>%h</code>\", which contains no URL.",
 			  line);
 	    ret = http_error("400", "Bad request", NULL, text);
@@ -279,8 +280,8 @@ char *got_data(struct connctx *ctx, char *data, int length,
 	if (!magic_access && !auth_correct) {
 	    if (auth_string && !auth_provided) {
 		ret = http_error("401", "Unauthorized",
-				 "WWW-Authenticate: Basic realm=\"agedu\"\r\n",
-				 "Please authenticate to view these pages.");
+				 "WWW-Authenticate: Basic realm=\""PNAME"\"\r",
+				 "\nPlease authenticate to view these pages.");
 	    } else {
 		ret = http_error("403", "Forbidden", NULL,
 				 "This is a restricted-access set of pages.");
@@ -487,7 +488,7 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
 	if (dcfg->basicauthdata) {
 	    userpass = dcfg->basicauthdata;
 	} else {
-	    sprintf(username, "agedu");
+	    strcpy(username, PNAME);
 	    rname = "/dev/urandom";
 	    fd = open(rname, O_RDONLY);
 	    if (fd < 0) {
@@ -551,7 +552,7 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
 	if (authmask != HTTPD_AUTH_NONE)
 	    printf("Web server is unauthenticated\n");
     } else {
-	fprintf(stderr, "agedu: authentication method not supported\n");
+	fprintf(stderr, PNAME ": authentication method not supported\n");
 	exit(1);
     }
     if (!dcfg->address) {

@@ -66,6 +66,7 @@ struct ctx {
     struct inclusion_exclusion *inex;
     int ninex;
     int crossfs;
+    int fakeatimes;
 };
 
 static void dump_line(const char *pathname, const struct trie_file *tf)
@@ -102,7 +103,10 @@ static int gotdata(void *vctx, const char *pathname, const struct stat64 *st)
 	return 0;
 
     file.size = (unsigned long long)512 * st->st_blocks;
-    file.atime = st->st_atime;
+    if (ctx->fakeatimes && S_ISDIR(st->st_mode))
+	file.atime = st->st_mtime;
+    else
+	file.atime = st->st_atime;
 
     /*
      * Filter based on wildcards.
@@ -302,6 +306,10 @@ static void text_query(const void *mappedfile, const char *querydir,
         HELPARG("wildcard") HELPOPT("[--scan] prune files matching pattern") \
     VAL(PRUNEPATH) LONG(prune_path) \
         HELPARG("wildcard") HELPOPT("[--scan] prune pathnames matching pattern") \
+    NOVAL(DIRATIME) LONG(dir_atime) LONG(dir_atimes) \
+        HELPOPT("[--scan] keep real atimes on directories") \
+    NOVAL(NODIRATIME) LONG(no_dir_atime) LONG(no_dir_atimes) \
+        HELPOPT("[--scan] fake atimes on directories") \
     VAL(TQDEPTH) LONG(depth) LONG(max_depth) LONG(maximum_depth) \
         HELPARG("levels") HELPOPT("[--text] recurse to this many levels") \
     VAL(MINAGE) SHORT(a) LONG(age) LONG(min_age) LONG(minimum_age) \
@@ -462,6 +470,7 @@ int main(int argc, char **argv)
     int ninex = 0, inexsize = 0;
     int crossfs = 0;
     int tqdepth = 1;
+    int fakediratimes = 1;
 
 #ifdef DEBUG_MAD_OPTION_PARSING_MACROS
     {
@@ -692,6 +701,12 @@ int main(int argc, char **argv)
 		  case OPT_NOCROSSFS:
 		    crossfs = 0;
 		    break;
+		  case OPT_DIRATIME:
+		    fakediratimes = 0;
+		    break;
+		  case OPT_NODIRATIME:
+		    fakediratimes = 1;
+		    break;
 		  case OPT_DATAFILE:
 		    filename = optval;
 		    break;
@@ -893,6 +908,7 @@ int main(int argc, char **argv)
 	    ctx->inex = inex;
 	    ctx->ninex = ninex;
 	    ctx->crossfs = crossfs;
+	    ctx->fakeatimes = fakediratimes;
 
 	    ctx->last_output_update = time(NULL);
 
@@ -1018,6 +1034,12 @@ int main(int argc, char **argv)
 		    return 1;
 		}
 
+		if (fakediratimes) {
+		    printf("Faking directory atimes\n");
+		    trie_fake_dir_atimes(mappedfile);
+		}
+
+		printf("Building index\n");
 		ib = indexbuild_new(mappedfile, st.st_size, count);
 		tw = triewalk_new(mappedfile);
 		while ((tf = triewalk_next(tw, NULL)) != NULL)

@@ -392,6 +392,117 @@ void triebuild_free(triebuild *tb)
 }
 
 /* ----------------------------------------------------------------------
+ * Memory-mapped trie modification.
+ */
+
+#define MNODE(t, off, type) \
+    ((struct type *)((char *)(t) + (off)))
+
+static unsigned long long fake_atime_recurse(void *t, struct trie_common *node,
+					     int last_seen_pathsep)
+{
+    while (node->type == TRIE_STRING) {
+	struct trie_string *st = (struct trie_string *)node;
+	last_seen_pathsep = (st->string[st->stringlen-1] == pathsep);
+	node = MNODE(t, st->subnode, trie_common);
+    }
+
+    if (node->type == TRIE_LEAF) {
+	struct trie_leaf *leaf = (struct trie_leaf *)node;
+	return leaf->file.atime;
+    } else if (assert(node->type == TRIE_SWITCH), 1) {
+	struct trie_switch *sw = (struct trie_switch *)node;
+	const char *chars = (const char *)&sw->sw[sw->len];
+	unsigned long long max = 0, subdir, ret;
+	int i;
+	int slashindex = -1, bareindex = -1;
+
+	/*
+	 * First, process all the children of this node whose
+	 * switch characters are not \0 or pathsep. We do this in
+	 * reverse order so as to maintain best cache locality
+	 * (tracking generally backwards through the file), though
+	 * it doesn't matter semantically.
+	 *
+	 * For each of these children, we're just recursing into
+	 * it to do any fixups required below it, and amalgamating
+	 * the max atimes we get back.
+	 */
+	for (i = sw->len; i-- > 0 ;) {
+	    if (chars[i] == '\0') {
+		bareindex = i;
+	    } else if (chars[i] == pathsep) {
+		slashindex = i;
+	    } else {
+		ret = fake_atime_recurse(t, MNODE(t, sw->sw[i].subnode,
+						  trie_common), 0);
+		if (max < ret)
+		    max = ret;
+	    }
+	}
+
+	/*
+	 * Now we have at most two child nodes left to deal with:
+	 * one with a slash (or general pathsep) and one with \0.
+	 *
+	 * If there's a slash node and a bare node, then the slash
+	 * node contains precisely everything inside the directory
+	 * described by the bare node; so we must retrieve the max
+	 * atime for the slash node and use it to fix up the bare
+	 * node.
+	 *
+	 * If there's only a bare node but the pathname leading up
+	 * to this point ends in a slash, then _all_ of the child
+	 * nodes of this node contain stuff inside the directory
+	 * described by the bare node; so we use the whole of the
+	 * maximum value we've computed so far to update the bare
+	 * node.
+	 */
+	if (slashindex >= 0) {
+	    ret = fake_atime_recurse(t, MNODE(t, sw->sw[slashindex].subnode,
+					      trie_common), 1);
+	    if (max < ret)
+		max = ret;
+
+	    subdir = ret;
+	} else if (last_seen_pathsep) {
+	    subdir = max;
+	} else {
+	    /* Don't update the bare subnode at all. */
+	    subdir = 0;
+	}
+
+	if (bareindex >= 0) {
+	    struct trie_leaf *leaf;
+
+	    leaf = MNODE(t, sw->sw[bareindex].subnode, trie_leaf);
+
+	    if (leaf && leaf->c.type == TRIE_LEAF) {
+		if (leaf->file.atime < subdir)
+		    leaf->file.atime = subdir;
+		ret = leaf->file.atime;
+	    } else {
+		/* Shouldn't really happen, but be cautious anyway */
+		ret = fake_atime_recurse(t, &leaf->c, 0);
+	    }
+
+	    if (max < ret)
+		max = ret;
+	}
+
+	return max;
+    }
+}
+
+void trie_fake_dir_atimes(void *t)
+{
+    struct trie_header *hdr = MNODE(t, 0, trie_header);
+    struct trie_common *node = MNODE(t, hdr->root, trie_common);
+
+    fake_atime_recurse(t, node, 1);
+}
+
+/* ----------------------------------------------------------------------
  * Querying functions.
  */
 

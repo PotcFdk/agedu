@@ -3,9 +3,6 @@ TODO list for agedu
 
 Before it's non-embarrassingly releasable:
 
- - arrange to be able to identify directories and leave them on one
-   side of the usual age display
-
  - cross-Unix portability:
     + use autoconf
        * configure use of stat64
@@ -15,6 +12,16 @@ Before it's non-embarrassingly releasable:
           + later glibcs have fdopendir, hooray! So we can use that
 	    too, if it's available and O_NOATIME is too.
        * what do we do elsewhere about _GNU_SOURCE?
+
+ - tweak the short options. I think dump files should be a
+   second-class feature in general, so that --dump and --load should
+   be represented by capital options. That leaves -d free to be
+   --depth, which I think is more generally useful.
+    * while I'm tweaking the options list, "[all modes]" ought to
+      say "[most modes]", due to --scan-dump.
+
+ - New mode: --remove, to destroy the data file. Handy for
+   totally self-contained usage: "-s . -w -R".
 
  - man page, --version.
 

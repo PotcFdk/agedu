@@ -50,6 +50,17 @@ int triebuild_finish(triebuild *tb);
 void triebuild_free(triebuild *tb);
 
 /* ----------------------------------------------------------------------
+ * Anomalous function which modifies a trie after it's memory-mapped.
+ */
+
+/*
+ * Invent new fake atimes for each directory in the trie, by
+ * taking the maximum (latest) of the directory's previously
+ * stored atime and the atimes of everything below it.
+ */
+void trie_fake_dir_atimes(void *t);
+
+/* ----------------------------------------------------------------------
  * Functions to query a trie given a pointer to the start of the
  * memory-mapped file.
  */

@@ -179,6 +179,9 @@ static void text_query(const void *mappedfile, const char *querydir,
     s1 = index_query(mappedfile, xi1, t);
     s2 = index_query(mappedfile, xi2, t);
 
+    if (xi2 - xi1 == 1)
+	return;			       /* file, or empty dir => no display */
+
     if (s1 == s2)
 	return;			       /* no space taken up => no display */
 

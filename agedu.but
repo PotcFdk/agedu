@@ -559,8 +559,6 @@ larger than available address space, which means that any use of
 \cw{agedu} on a seriously large file system is probably going to
 have to be done on a 64-bit computer.
 
-Also, \cw{agedu} has not yet been \e{tested} on a 64-bit computer.
-
 The data structure also does not usefully permit access control
 within the data file, so it would be difficult \dash even given the
 willingness to do additional coding \dash to run a system-wide

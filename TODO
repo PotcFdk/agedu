@@ -9,8 +9,6 @@ Before it's non-embarrassingly releasable:
        + later glibcs have fdopendir, hooray! So we can use that
 	 too, if it's available and O_NOATIME is too.
 
- - man page, --version.
-
 Future possibilities:
 
  - IPv6 support in the HTTP server

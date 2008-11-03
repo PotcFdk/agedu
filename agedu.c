@@ -616,7 +616,12 @@ int main(int argc, char **argv)
 		    usage(stdout);
 		    return 0;
 		  case OPT_VERSION:
-		    printf("FIXME: version();\n");
+#ifdef PACKAGE_VERSION
+		    printf("%s, revision %s\n", PNAME, PACKAGE_VERSION);
+#else
+		    printf("%s: version number not available when not built"
+			   " via automake\n", PNAME);
+#endif
 		    return 0;
 		  case OPT_LICENCE:
 		    {

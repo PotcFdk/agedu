@@ -68,7 +68,10 @@ along the lines of
 \c URL: http://127.164.152.163:48638/
 
 (That URL will always begin with \cq{127.}, meaning that it's in the
-\cw{localhost} address space.)
+\cw{localhost} address space. So only processes running on the same
+computer can even try to connect to that web server, and also there
+is access control to prevent other users from seeing it \dash see
+below for more detail.)
 
 Now paste that URL into your web browser, and you will be shown a
 graphical representation of the disk usage in \cw{/home/fred} and
@@ -241,9 +244,11 @@ whereas \cw{-S} will not.
 
 \lcont{
 
-(Actually, the output will not be exactly identical, due to a
-difference in treatment of last-access times on directories. See the
-documentation of the \cw{--dir-atime} option in the next section.
+(The output will not be exactly \e{identical}, due to a
+difference in treatment of last-access times on directories.
+However, it should be effectively equivalent for most purposes. See
+the documentation of the \cw{--dir-atime} option in the next section
+for further detail.)
 
 }
 
@@ -556,8 +561,8 @@ files and directories and about 20Gb of data, produced an index file
 nearly a third of a Gb in size. Furthermore, since the data file
 must be memory-mapped during most processing, it can never grow
 larger than available address space, which means that any use of
-\cw{agedu} on a seriously large file system is probably going to
-have to be done on a 64-bit computer.
+\cw{agedu} on a file system more than about ten times the above size
+is probably going to have to be done on a 64-bit computer.
 
 The data structure also does not usefully permit access control
 within the data file, so it would be difficult \dash even given the

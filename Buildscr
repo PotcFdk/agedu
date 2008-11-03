@@ -4,6 +4,9 @@
 
 module agedu
 
+# Build the man page.
+in agedu do make doc
+
 in agedu do sed '/AC_INIT/s/6.66/r$(revision)/' configure.ac > tmp.ac
 in agedu do mv tmp.ac configure.ac
 in agedu do aclocal

@@ -32,7 +32,7 @@ AC_FUNC_MMAP
 AC_FUNC_SELECT_ARGTYPES
 AC_FUNC_STRFTIME
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS([ftruncate inet_ntoa memchr munmap select socket strcasecmp strchr strcspn strerror strrchr strspn strtoul strtoull])
+AC_CHECK_FUNCS([ftruncate fdopendir inet_ntoa lstat64 memchr munmap select socket strcasecmp strchr strcspn strerror strrchr strspn strtoul strtoull])
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

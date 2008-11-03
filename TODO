@@ -1,15 +1,13 @@
 TODO list for agedu
 ===================
 
-Before it's non-embarrassingly releasable:
-
- - now we have a configure framework, actually use it to:
-    * configure use of stat64
-    * configure use of Linux syscall magic replacing readdir
-       + later glibcs have fdopendir, hooray! So we can use that
-	 too, if it's available and O_NOATIME is too.
-
 Future possibilities:
+
+ - integrate more usefully with the output of configure. It's
+   generating oodles of automatic boilerplate in config.h and I'm
+   sure three quarters of it _ought_ to be usable to add
+   portability, if only I had the gumption to actually pay attention
+   to all those HAVE_FOO macros it's defined for me.
 
  - IPv6 support in the HTTP server
     * of course, Linux magic auth can still work in this context; we

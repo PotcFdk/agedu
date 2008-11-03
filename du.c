@@ -14,24 +14,92 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "agedu.h"
 #include "du.h"
 #include "alloc.h"
 
-#ifdef __linux__
+#if !defined __linux__ || defined HAVE_FDOPENDIR
 
 /*
- * On Linux, we have the O_NOATIME flag. This means we can read
- * the contents of directories without affecting their atimes,
- * which enables us to at least try to include them in the age
- * display rather than exempting them.
- *
- * Unfortunately, opendir() doesn't let us open a directory with
- * O_NOATIME. In later glibcs we can open one manually using
- * open() and then use fdopendir() to translate the fd into a
- * POSIX dir handle; in earlier glibcs fdopendir() is not
- * available, so we have no option but to talk directly to the
- * kernel system call interface which underlies the POSIX
- * opendir/readdir machinery.
+ * Wrappers around POSIX opendir, readdir and closedir, which
+ * permit me to replace them with different wrappers in special
+ * circumstances.
+ */
+
+#include <dirent.h>
+typedef DIR *dirhandle;
+
+int open_dir(const char *path, dirhandle *dh)
+{
+#if defined O_NOATIME && defined HAVE_FDOPENDIR
+
+    /*
+     * On Linux, we have the O_NOATIME flag. This means we can
+     * read the contents of directories without affecting their
+     * atimes, which enables us to at least try to include them in
+     * the age display rather than exempting them.
+     *
+     * Unfortunately, opendir() doesn't let us open a directory
+     * with O_NOATIME. So instead, we have to open the directory
+     * with vanilla open(), and then use fdopendir() to translate
+     * the fd into a POSIX dir handle.
+     */
+    int fd;
+    
+    fd = open(path, O_RDONLY | O_NONBLOCK | O_NOCTTY | O_LARGEFILE |
+	      O_NOATIME | O_DIRECTORY);
+    if (fd < 0) {
+	/*
+	 * Opening a file with O_NOATIME is not unconditionally
+	 * permitted by the Linux kernel. As far as I can tell,
+	 * it's permitted only for files on which the user would
+	 * have been able to call utime(2): in other words, files
+	 * for which the user could have deliberately set the
+	 * atime back to its original value after finishing with
+	 * it. Hence, O_NOATIME has no security implications; it's
+	 * simply a cleaner, faster and more race-condition-free
+	 * alternative to stat(), a normal open(), and a utimes()
+	 * when finished.
+	 *
+	 * The upshot of all of which, for these purposes, is that
+	 * we must be prepared to try again without O_NOATIME if
+	 * we receive EPERM.
+	 */
+	if (errno == EPERM)
+	    fd = open(path, O_RDONLY | O_NONBLOCK | O_NOCTTY |
+		      O_LARGEFILE | O_DIRECTORY);
+	if (fd < 0)
+	    return -1;
+    }
+
+    *dh = fdopendir(fd);
+#else
+    *dh = opendir(path);
+#endif
+
+    if (!*dh)
+	return -1;
+    return 0;
+}
+
+const char *read_dir(dirhandle *dh)
+{
+    struct dirent *de = readdir(*dh);
+    return de ? de->d_name : NULL;
+}
+
+void close_dir(dirhandle *dh)
+{
+    closedir(*dh);
+}
+
+#else /* defined __linux__ && !defined HAVE_FDOPENDIR */
+
+/*
+ * Earlier versions of glibc do not have fdopendir(). Therefore,
+ * if we are on Linux and still wish to make use of O_NOATIME, we
+ * have no option but to talk directly to the kernel system call
+ * interface which underlies the POSIX opendir/readdir machinery.
  */
 
 #define __KERNEL__
@@ -52,26 +120,16 @@ typedef struct {
 
 int open_dir(const char *path, dirhandle *dh)
 {
-    dh->fd = open(path, O_RDONLY | O_NOATIME | O_DIRECTORY);
+    /*
+     * As above, we try with O_NOATIME and then fall back to
+     * trying without it.
+     */
+    dh->fd = open(path, O_RDONLY | O_NONBLOCK | O_NOCTTY | O_LARGEFILE |
+		  O_NOATIME | O_DIRECTORY);
     if (dh->fd < 0) {
-	/*
-	 * Opening a file with O_NOATIME is not unconditionally
-	 * permitted by the Linux kernel. As far as I can tell,
-	 * it's permitted only for files on which the user would
-	 * have been able to call utime(2): in other words, files
-	 * for which the user could have deliberately set the
-	 * atime back to its original value after finishing with
-	 * it. Hence, O_NOATIME has no security implications; it's
-	 * simply a cleaner, faster and more race-condition-free
-	 * alternative to stat(), a normal open(), and a utimes()
-	 * when finished.
-	 *
-	 * The upshot of all of which, for these purposes, is that
-	 * we must be prepared to try again without O_NOATIME if
-	 * we receive EPERM.
-	 */
 	if (errno == EPERM)
-	    dh->fd = open(path, O_RDONLY | O_DIRECTORY);
+	    dh->fd = open(path, O_RDONLY | O_NONBLOCK | O_NOCTTY |
+			  O_LARGEFILE | O_DIRECTORY);
 	if (dh->fd < 0)
 	    return -1;
     }
@@ -106,36 +164,7 @@ void close_dir(dirhandle *dh)
     close(dh->fd);
 }
 
-#else /* __linux__ */
-
-/*
- * This branch of the ifdef is a simple exercise of ordinary POSIX
- * opendir/readdir.
- */
-
-#include <dirent.h>
-typedef DIR *dirhandle;
-
-int open_dir(const char *path, dirhandle *dh)
-{
-    *dh = opendir(path);
-    if (!*dh)
-	return -1;
-    return 0;
-}
-
-const char *read_dir(dirhandle *dh)
-{
-    struct dirent *de = readdir(*dh);
-    return de ? de->d_name : NULL;
-}
-
-void close_dir(dirhandle *dh)
-{
-    closedir(*dh);
-}
-
-#endif
+#endif /* !defined __linux__ || defined HAVE_FDOPENDIR */
 
 static int str_cmp(const void *av, const void *bv)
 {
@@ -147,11 +176,11 @@ static void du_recurse(char **path, size_t pathlen, size_t *pathsize,
 {
     const char *name;
     dirhandle d;
-    struct stat64 st;
+    STRUCT_STAT st;
     char **names;
     size_t i, nnames, namesize;
 
-    if (lstat64(*path, &st) < 0) {
+    if (LSTAT(*path, &st) < 0) {
 	fprintf(stderr, "%s: lstat: %s\n", *path, strerror(errno));
 	return;
     }

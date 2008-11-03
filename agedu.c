@@ -82,7 +82,7 @@ static void dump_line(const char *pathname, const struct trie_file *tf)
     putchar('\n');
 }
 
-static int gotdata(void *vctx, const char *pathname, const struct stat64 *st)
+static int gotdata(void *vctx, const char *pathname, const STRUCT_STAT *st)
 {
     struct ctx *ctx = (struct ctx *)vctx;
     struct trie_file file;

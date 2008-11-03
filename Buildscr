@@ -19,4 +19,7 @@ in . do cp -R agedu agedu-r$(revision)
 in . do rm agedu-r$(revision)/GNUmakefile
 in . do tar chzvf agedu-r$(revision).tar.gz agedu-r$(revision)
 
+in agedu do halibut --html=manpage.html agedu.but
+
 deliver agedu-r$(revision).tar.gz $@
+deliver agedu/manpage.html $@

@@ -31,6 +31,12 @@ $(ALLOBJS): %.o: %.c
 	gcc $(CFLAGS) -MM $*.c > $*.d
 	gcc $(CFLAGS) $(INTERNALFLAGS) -c $*.c
 
+MANPAGES = agedu.1
+
+doc: $(MANPAGES)
+$(MANPAGES): %.1: %.but
+	halibut --man=$*.1 $*.but
+
 clean:
 	rm -f agedu $(ALLOBJS) $(ALLDEPS)
 

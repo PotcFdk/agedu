@@ -273,22 +273,38 @@ static void text_query(const void *mappedfile, const char *querydir,
     HELPPFX("actions") \
     VAL(SCAN) SHORT(s) LONG(scan) \
 	HELPARG("directory") HELPOPT("scan and index a directory") \
-    NOVAL(DUMP) SHORT(D) LONG(dump) HELPOPT("dump the index file on stdout") \
-    VAL(SCANDUMP) SHORT(S) LONG(scan_dump) \
-	HELPARG("directory") HELPOPT("scan only, generating a dump") \
-    NOVAL(LOAD) SHORT(L) LONG(load) \
-	HELPOPT("load and index a dump file") \
-    VAL(TEXT) SHORT(t) LONG(text) \
-	HELPARG("subdir") HELPOPT("print a plain text report on a subdirectory") \
-    VAL(HTML) SHORT(H) LONG(html) \
-	HELPARG("subdir") HELPOPT("print an HTML report on a subdirectory") \
     NOVAL(HTTPD) SHORT(w) LONG(web) LONG(server) LONG(httpd) \
         HELPOPT("serve HTML reports from a temporary web server") \
+    VAL(TEXT) SHORT(t) LONG(text) \
+	HELPARG("subdir") HELPOPT("print a plain text report on a subdirectory") \
     NOVAL(REMOVE) SHORT(R) LONG(remove) LONG(delete) LONG(unlink) \
         HELPOPT("remove the index file") \
+    NOVAL(DUMP) SHORT(D) LONG(dump) HELPOPT("dump the index file on stdout") \
+    NOVAL(LOAD) SHORT(L) LONG(load) \
+	HELPOPT("load and index a dump file") \
+    VAL(SCANDUMP) SHORT(S) LONG(scan_dump) \
+	HELPARG("directory") HELPOPT("scan only, generating a dump") \
+    VAL(HTML) SHORT(H) LONG(html) \
+	HELPARG("subdir") HELPOPT("print an HTML report on a subdirectory") \
     HELPPFX("options") \
     VAL(DATAFILE) SHORT(f) LONG(file) \
         HELPARG("filename") HELPOPT("[most modes] specify index file") \
+    NOVAL(CROSSFS) LONG(cross_fs) \
+        HELPOPT("[--scan] cross filesystem boundaries") \
+    NOVAL(NOCROSSFS) LONG(no_cross_fs) \
+        HELPOPT("[--scan] stick to one filesystem") \
+    VAL(PRUNE) LONG(prune) \
+        HELPARG("wildcard") HELPOPT("[--scan] prune files matching pattern") \
+    VAL(PRUNEPATH) LONG(prune_path) \
+        HELPARG("wildcard") HELPOPT("[--scan] prune pathnames matching pattern") \
+    VAL(EXCLUDE) LONG(exclude) \
+        HELPARG("wildcard") HELPOPT("[--scan] exclude files matching pattern") \
+    VAL(EXCLUDEPATH) LONG(exclude_path) \
+        HELPARG("wildcard") HELPOPT("[--scan] exclude pathnames matching pattern") \
+    VAL(INCLUDE) LONG(include) \
+        HELPARG("wildcard") HELPOPT("[--scan] include files matching pattern") \
+    VAL(INCLUDEPATH) LONG(include_path) \
+        HELPARG("wildcard") HELPOPT("[--scan] include pathnames matching pattern") \
     NOVAL(PROGRESS) LONG(progress) LONG(scan_progress) \
         HELPOPT("[--scan] report progress on stderr") \
     NOVAL(NOPROGRESS) LONG(no_progress) LONG(no_scan_progress) \
@@ -296,32 +312,12 @@ static void text_query(const void *mappedfile, const char *querydir,
     NOVAL(TTYPROGRESS) LONG(tty_progress) LONG(tty_scan_progress) \
 		       LONG(progress_tty) LONG(scan_progress_tty) \
         HELPOPT("[--scan] report progress if stderr is a tty") \
-    NOVAL(CROSSFS) LONG(cross_fs) \
-        HELPOPT("[--scan] cross filesystem boundaries") \
-    NOVAL(NOCROSSFS) LONG(no_cross_fs) \
-        HELPOPT("[--scan] stick to one filesystem") \
-    VAL(INCLUDE) LONG(include) \
-        HELPARG("wildcard") HELPOPT("[--scan] include files matching pattern") \
-    VAL(INCLUDEPATH) LONG(include_path) \
-        HELPARG("wildcard") HELPOPT("[--scan] include pathnames matching pattern") \
-    VAL(EXCLUDE) LONG(exclude) \
-        HELPARG("wildcard") HELPOPT("[--scan] exclude files matching pattern") \
-    VAL(EXCLUDEPATH) LONG(exclude_path) \
-        HELPARG("wildcard") HELPOPT("[--scan] exclude pathnames matching pattern") \
-    VAL(PRUNE) LONG(prune) \
-        HELPARG("wildcard") HELPOPT("[--scan] prune files matching pattern") \
-    VAL(PRUNEPATH) LONG(prune_path) \
-        HELPARG("wildcard") HELPOPT("[--scan] prune pathnames matching pattern") \
     NOVAL(DIRATIME) LONG(dir_atime) LONG(dir_atimes) \
-        HELPOPT("[--scan] keep real atimes on directories") \
+        HELPOPT("[--scan,--load] keep real atimes on directories") \
     NOVAL(NODIRATIME) LONG(no_dir_atime) LONG(no_dir_atimes) \
-        HELPOPT("[--scan] fake atimes on directories") \
-    VAL(TQDEPTH) SHORT(d) LONG(depth) LONG(max_depth) LONG(maximum_depth) \
-        HELPARG("levels") HELPOPT("[--text] recurse to this many levels") \
-    VAL(MINAGE) SHORT(a) LONG(age) LONG(min_age) LONG(minimum_age) \
-        HELPARG("age") HELPOPT("[--text] include only files older than this") \
+        HELPOPT("[--scan,--load] fake atimes on directories") \
     VAL(AGERANGE) SHORT(r) LONG(age_range) LONG(range) LONG(ages) \
-        HELPARG("age[-age]") HELPOPT("[--html,--web] set limits of colour coding") \
+        HELPARG("age[-age]") HELPOPT("[--web,--html] set limits of colour coding") \
     VAL(SERVERADDR) LONG(address) LONG(addr) LONG(server_address) \
               LONG(server_addr) \
         HELPARG("addr[:port]") HELPOPT("[--web] specify HTTP server address") \
@@ -332,6 +328,10 @@ static void text_query(const void *mappedfile, const char *querydir,
         HELPARG("filename") HELPOPT("[--web] read HTTP Basic user/pass from file") \
     VAL(AUTHFD) LONG(auth_fd) \
         HELPARG("fd") HELPOPT("[--web] read HTTP Basic user/pass from fd") \
+    VAL(TQDEPTH) SHORT(d) LONG(depth) LONG(max_depth) LONG(maximum_depth) \
+        HELPARG("levels") HELPOPT("[--text] recurse to this many levels") \
+    VAL(MINAGE) SHORT(a) LONG(age) LONG(min_age) LONG(minimum_age) \
+        HELPARG("age") HELPOPT("[--text] include only files older than this") \
     HELPPFX("also") \
     NOVAL(HELP) SHORT(h) LONG(help) HELPOPT("display this help text") \
     NOVAL(VERSION) SHORT(V) LONG(version) HELPOPT("report version number") \

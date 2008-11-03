@@ -1,0 +1,575 @@
+\cfg{man-identity}{agedu}{1}{2008-11-02}{Simon Tatham}{Simon Tatham}
+
+\define{dash} \u2013{-}
+
+\title Man page for \cw{agedu}
+
+\U NAME
+
+\cw{agedu} - correlate disk usage with last-access times to identify
+large and disused data
+
+\U SYNOPSIS
+
+\c agedu [ options ] action [action...]
+\e bbbbb   iiiiiii   iiiiii  iiiiii
+
+\U DESCRIPTION
+
+\cw{agedu} scans a directory tree and produces reports about how
+much disk space is used in each directory and subdirectory, and also
+how that usage of disk space corresponds to files with last-access
+times a long time ago.
+
+In other words, \cw{agedu} is a tool you might use to help you free
+up disk space. It lets you see which directories are taking up the
+most space, as \cw{du} does; but unlike \cw{du}, it also
+distinguishes between large collections of data which are still in
+use and ones which have not been accessed in months or years \dash
+for instance, large archives downloaded, unpacked, used once, and
+never cleaned up. Where \cw{du} helps you find what's using your
+disk space, \cw{agedu} helps you find what's \e{wasting} your disk
+space.
+
+\cw{agedu} has several operating modes. In one mode, it scans your
+disk and builds an index file containing a data structure which
+allows it to efficiently retrieve any information it might need.
+Typically, you would use it in this mode first, and then run it in
+one of a number of \q{query} modes to display a report of the disk
+space usage of a particular directory and its subdirectories. Those
+reports can be produced as plain text (much like \cw{du}) or as
+HTML. \cw{agedu} can even run as a miniature web server, presenting
+each directory's HTML report with hyperlinks to let you navigate
+around the file system to similar reports for other directories.
+
+So you would typically start using \cw{agedu} by telling it to do a
+scan of a directory tree and build an index. This is done with a
+command such as
+
+\c $ agedu -s /home/fred
+\e   bbbbbbbbbbbbbbbbbbb
+
+which will build a large data file called \c{agedu.dat} in your
+current directory. (If that current directory is \e{inside}
+\cw{/home/fred}, don't worry \dash \cw{agedu} is smart enough to
+discount its own index file.)
+
+Having built the index, you would now query it for reports of disk
+space usage. If you have a graphical web browser, the simplest and
+nicest way to query the index is by running \cw{agedu} in web server
+mode:
+
+\c $ agedu -w
+\e   bbbbbbbb
+
+which will print (among other messages) a URL on its standard output
+along the lines of
+
+\c URL: http://127.164.152.163:48638/
+
+(That URL will always begin with \cq{127.}, meaning that it's in the
+\cw{localhost} address space.)
+
+Now paste that URL into your web browser, and you will be shown a
+graphical representation of the disk usage in \cw{/home/fred} and
+its immediate subdirectories, with varying colours used to show the
+difference between disused and recently-accessed data. Click on any
+subdirectory to descend into it and see a report for its
+subdirectories in turn; click on parts of the pathname at the top of
+any page to return to higher-level directories. When you've finished
+browsing, you can just press Ctrl-D to send an end-of-file
+indication to \cw{agedu}, and it will shut down.
+
+After that, you probably want to delete the data file
+\cw{agedu.dat}, since it's pretty large. In fact, the command
+\cw{agedu -R} will do this for you; and you can chain \cw{agedu}
+commands on the same command line, so that instead of the above you
+could have done
+
+\c $ agedu -s /home/fred -w -R
+\e   bbbbbbbbbbbbbbbbbbbbbbbbb
+
+for a single self-contained run of \cw{agedu} which builds its
+index, serves web pages from it, and cleans it up when finished.
+
+If you don't have a graphical web browser, you can do text-based
+queries as well. Having scanned \cw{/home/fred} as above, you might
+run
+
+\c $ agedu -t /home/fred
+\e   bbbbbbbbbbbbbbbbbbb
+
+which again gives a summary of the disk usage in \cw{/home/fred} and
+its immediate subdirectories; but this time \cw{agedu} will print it
+on standard output, in much the same format as \cw{du}. If you then
+want to find out how much \e{old} data is there, you can add the
+\cw{-a} option to show only files last accessed a certain length of
+time ago. For example, to show only files which haven't been looked
+at in six months or more:
+
+\c $ agedu -t /home/fred -a 6m
+\e   bbbbbbbbbbbbbbbbbbbbbbbbb
+
+That's the essence of what \cw{agedu} does. It has other modes of
+operation for more complex situations, and the usual array of
+configurable options. The following sections contain a complete
+reference for all its functionality.
+
+\U OPERATING MODES
+
+This section describes the operating modes supported by \cw{agedu}.
+Each of these is in the form of a command-line option, sometimes
+with an argument. Multiple operating-mode options may appear on the
+command line, in which case \cw{agedu} will perform the specified
+actions one after another. For instance, as shown in the previous
+section, you might want to perform a disk scan and immediately
+launch a web server giving reports from that scan.
+
+\dt \cw{-s} \e{directory} or \cw{--scan} \e{directory}
+
+\dd In this mode, \cw{agedu} scans the file system starting at the
+specified directory, and indexes the results of the scan into a
+large data file which other operating modes can query.
+
+\lcont{
+
+By default, the scan is restricted to a single file system (since
+the expected use of \cw{agedu} is that you would probably use it
+because a particular disk partition was running low on space). You
+can remove that restriction using the \cw{--cross-fs} option; other
+configuration options allow you to include or exclude files or
+entire subdirectories from the scan. See the next section for full
+details of the configurable options.
+
+The index file is created with restrictive permissions, in case the
+file system you are scanning contains confidential information in
+its structure.
+
+Index files are dependent on the characteristics of the CPU
+architecture you created them on. You should not expect to be able
+to move an index file between different types of computer and have
+it continue to work. If you need to transfer the results of a disk
+scan to a different kind of computer, see the \cw{-D} and \cw{-L}
+options below.
+
+}
+
+\dt \cw{-w} or \cw{--web}
+
+\dd In this mode, \cw{agedu} expects to find an index file already
+written. It allocates a network port, and starts up a web server on
+that port which serves reports generated from the index file. By
+default it invents its own URL and prints it out.
+
+\lcont{
+
+The web server runs until \cw{agedu} receives an end-of-file event
+on its standard input. (The expected usage is that you run it from
+the command line, immediately browse web pages until you're
+satisfied, and then press Ctrl-D.)
+
+In case the index file contains any confidential information about
+your file system, the web server protects the pages it serves from
+access by other people. On Linux, this is done transparently by
+means of using \cw{/proc/net/tcp} to check the owner of each
+incoming connection; failing that, the web server will require a
+password to view the reports, and \cw{agedu} will print the password
+it invented on standard output along with the URL.
+
+Configurable options for this mode let you specify your own address
+and port number to listen on, and also specify your own choice of
+authentication method (including turning authentication off
+completely) and a username and password of your choice.
+
+}
+
+\dt \cw{-t} \e{directory} or \cw{--text} \e{directory}
+
+\dd In this mode, \cw{agedu} generates a textual report on standard
+output, listing the disk usage in the specified directory and all
+its subdirectories down to a fixed depth. By default that depth is
+1, so that you see a report for \e{directory} itself and all of its
+immediate subdirectories. You can configure a different depth using
+\cw{-d}, described in the next section.
+
+\lcont{
+
+Used on its own, \cw{-t} merely lists the \e{total} disk usage in
+each subdirectory; \cw{agedu}'s additional ability to distinguish
+unused from recently-used data is not activated. To activate it, use
+the \cw{-a} option to specify a minimum age.
+
+The directory structure stored in \cw{agedu}'s index file is treated
+as a set of literal strings. This means that you cannot refer to
+directories by synonyms. So if you ran \cw{agedu -s .}, then all the
+path names you later pass to the \cw{-t} option must be either
+\cq{.} or begin with \cq{./}. Similarly, symbolic links within the
+directory you scanned will not be followed; you must refer to each
+directory by its canonical, symlink-free pathname.
+
+}
+
+\dt \cw{-R} or \cw{--remove}
+
+\dd In this mode, \cw{agedu} deletes its index file. Running just
+\cw{agedu -R} on its own is therefore equivalent to typing \cw{rm
+agedu.dat}. However, you can also put \cw{-R} on the end of a
+command line to indicate that \cw{agedu} should delete its index
+file after it finishes performing other operations.
+
+\dt \cw{-D} or \cw{--dump}
+
+\dd In this mode, \cw{agedu} reads an existing index file and
+produces a dump of its contents on standard output. This dump can
+later be loaded into a new index file, perhaps on another computer.
+
+\dt \cw{-L} or \cw{--load}
+
+\dd In this mode, \cw{agedu} expects to read a dump produced by the
+\cw{-D} option from its standard input. It constructs an index file
+from that dump, exactly as it would have if it had read the same
+data from a disk scan in \cw{-s} mode.
+
+\dt \cw{-S} \e{directory} or \cw{--scan-dump} \e{directory}
+
+\dd In this mode, \cw{agedu} will scan a directory tree and convert
+the results straight into a dump on standard output, without
+generating an index file at all. So running \cw{agedu -S /path}
+should produce equivalent output to that of \cw{agedu -s /path -D},
+except that the latter will produce an index file as a side effect
+whereas \cw{-S} will not.
+
+\lcont{
+
+(Actually, the output will not be exactly identical, due to a
+difference in treatment of last-access times on directories. See the
+documentation of the \cw{--dir-atime} option in the next section.
+
+}
+
+\dt \cw{-H} \e{directory} or \cw{--html} \e{directory}
+
+\dd In this mode, \cw{agedu} will generate an HTML report of the
+disk usage in the specified directory and its immediate
+subdirectories, in the same form that it serves from its web server
+in \cw{-w} mode. However, this time, a single HTML report will be
+generated and simply written to standard output, with no hyperlinks
+pointing to other similar pages.
+
+\U OPTIONS
+
+This section describes the various configuration options that affect
+\cw{agedu}'s operation in one mode or another.
+
+The following option affects nearly all modes (except \cw{-S}):
+
+\dt \cw{-f} \e{filename} or \cw{--file} \e{filename}
+
+\dd Specifies the location of the index file which \cw{agedu}
+creates, reads or removes depending on its operating mode. By
+default, this is simply \cq{agedu.dat}, in whatever is the current
+working directory when you run \cw{agedu}.
+
+The following options affect the disk-scanning modes, \cw{-s} and
+\cw{-S}:
+
+\dt \cw{--cross-fs} and \cw{--no-cross-fs}
+
+\dd These configure whether or not the disk scan is permitted to
+cross between different file systems. The default is not to:
+\cw{agedu} will normally skip over subdirectories on which a
+different file system is mounted. This makes it convenient when you
+want to free up space on a particular file system which is running
+low. However, in other circumstances you might wish to see general
+information about the use of space no matter which file system it's
+on (for instance, if your real concern is your backup media running
+out of space, and if your backups do not treat different file
+systems specially); in that situation, use \cw{--cross-fs}.
+
+\lcont{
+
+(Note that this default is the opposite way round from the
+corresponding option in \cw{du}.)
+
+}
+
+\dt \cw{--prune} \e{wildcard} and \cw{--prune-path} \e{wildcard}
+
+\dd These cause particular files or directories to be omitted
+entirely from the scan. If \cw{agedu}'s scan encounters a file or
+directory whose name matches the wildcard provided to the
+\cw{--prune} option, it will not include that file in its index, and
+also if it's a directory it will skip over it and not scan its
+contents.
+
+\lcont{
+
+Note that in most Unix shells, wildcards will probably need to be
+escaped on the command line, to prevent the shell from expanding the
+wildcard before \cw{agedu} sees it.
+
+\cw{--prune-path} is similar to \cw{--prune}, except that the
+wildcard is matched against the entire pathname instead of just the
+filename at the end of it. So whereas \cw{--prune *a*b*} will match
+any file whose actual name contains an \cw{a} somewhere before a
+\cw{b}, \cw{--prune-path *a*b*} will also match a file whose name
+contains \cw{b} and which is inside a directory containing an
+\cw{a}, or any file inside a directory of that form, and so on.
+
+}
+
+\dt \cw{--exclude} \e{wildcard} and \cw{--exclude-path} \e{wildcard}
+
+\dd These cause particular files or directories to be omitted from
+the index, but not from the scan. If \cw{agedu}'s scan encounters a
+file or directory whose name matches the wildcard provided to the
+\cw{--exclude} option, it will not include that file in its index
+\dash but unlike \cw{--prune}, if the file in question is a
+directory it will still scan its contents and index them if they are
+not ruled out themselves by \cw{--exclude} options.
+
+\lcont{
+
+As above, \cw{--exclude-path} is similar to \cw{--exclude}, except
+that the wildcard is matched against the entire pathname.
+
+}
+
+\dt \cw{--include} \e{wildcard} and \cw{--include-path} \e{wildcard}
+
+\dd These cause particular files or directories to be re-included in
+the index and the scan, if they had previously been ruled out by one
+of the above exclude or prune options. You can interleave include,
+exclude and prune options as you wish on the command line, and if
+more than one of them applies to a file then the last one takes
+priority.
+
+\lcont{
+
+For example, if you wanted to see only the disk space taken up by
+MP3 files, you might run
+
+\c $ agedu -s . --exclude '*' --include '*.mp3'
+\e   bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+
+which will cause everything to be omitted from the scan, but then
+the MP3 files to be put back in. If you then wanted only a subset of
+those MP3s, you could then exclude some of them again by adding,
+say, \cq{--exclude-path './queen/*'} (or, more efficiently,
+\cq{--prune ./queen}) on the end of that command.
+
+As with the previous two options, \cw{--include-path} is similar to
+\cw{--include} except that the wildcard is matched against the
+entire pathname.
+
+}
+
+\dt \cw{--progress}, \cw{--no-progress} and \cw{--tty-progress}
+
+\dd When \cw{agedu} is scanning a directory tree, it will typically
+print a one-line progress report every second showing where it has
+reached in the scan, so you can have some idea of how much longer it
+will take. (Of course, it can't predict \e{exactly} how long it will
+take, since it doesn't know which of the directories it hasn't
+scanned yet will turn out to be huge.)
+
+\lcont{
+
+By default, those progress reports are displayed on \cw{agedu}'s
+standard error channel, if that channel points to a terminal device.
+If you need to manually enable or disable them, you can use the
+above three options to do so: \cw{--progress} unconditionally
+enables the progress reports, \cw{--no-progress} unconditionally
+disables them, and \cw{--tty-progress} reverts to the default
+behaviour which is conditional on standard error being a terminal.
+
+}
+
+\dt \cw{--dir-atime} and \cw{--no-dir-atime}
+
+\dd In normal operation, \cw{agedu} ignores the atimes (last access
+times) on the \e{directories} it scans: it only pays attention to
+the atimes of the \e{files} inside those directories. This is
+because directory atimes tend to be reset by a lot of system
+administrative tasks, such as \cw{cron} jobs which scan the file
+system for one reason or another \dash or even other invocations of
+\cw{agedu} itself, though it tries to avoid modifying any atimes if
+possible. So the literal atimes on directories are typically not
+representative of how long ago the data in question was last
+accessed with real intent to use that data in particular.
+
+\lcont{
+
+Instead, \cw{agedu} makes up a fake atime for every directory it
+scans, which is equal to the newest atime of any file in or below
+that directory (or the directory's last \e{modification} time,
+whichever is newest). This is based on the assumption that all
+\e{important} accesses to directories are actually accesses to the
+files inside those directories, so that when any file is accessed
+all the directories on the path leading to it should be considered
+to have been accessed as well.
+
+In unusual cases it is possible that a directory itself might embody
+important data which is accessed by reading the directory. In that
+situation, \cw{agedu}'s atime-faking policy will misreport the
+directory as disused. In the unlikely event that such directories
+form a significant part of your disk space usage, you might want to
+turn off the faking. The \cw{--dir-atime} option does this: it
+causes the disk scan to read the original atimes of the directories
+it scans.
+
+The faking of atimes on directories also requires a processing pass
+over the index file after the main disk scan is complete.
+\cw{--dir-atime} also turns this pass off. Hence, this option
+affects the \cw{-L} option as well as \cw{-s} and \cw{-S}.
+
+(The previous section mentioned that there might be subtle
+differences between the output of \cw{agedu -s /path -D} and
+\cw{agedu -S /path}. This is why. Doing a scan with \cw{-s} and then
+dumping it with \cw{-D} will dump the fully faked atimes on the
+directories, whereas doing a scan-to-dump with \cw{-S} will dump
+only \e{partially} faked atimes \dash specifically, each directory's
+last modification time \dash since the subsequent processing pass
+will not have had a chance to take place. However, loading either of
+the resulting dump files with \cw{-L} will perform the atime-faking
+processing pass, leading to the same data in the index file in each
+case. In normal usage it should be safe to ignore all of this
+complexity.)
+
+}
+
+The following options affect the web server mode \cw{-w}, and in one
+case also the stand-along HTML generation mode \cw{-H}:
+
+\dt \cw{-r} \e{age range} or \cw{--age-range} \e{age range}
+
+\dd The HTML reports produced by \cw{agedu} use a range of colours
+to indicate how long ago data was last accessed, running from red
+(representing the most disused data) to green (representing the
+newest). By default, the lengths of time represented by the two ends
+of that spectrum are chosen by examining the data file to see what
+range of ages appears in it. However, you might want to set your own
+limits, and you can do this using \cw{-r}.
+
+\lcont{
+
+The argument to \cw{-r} consists of a single age, or two ages
+separated by a minus sign. An age is a number, followed by one of
+\cq{y} (years), \cq{m} (months), \cq{w} (weeks) or \cq{d} (days).
+The first age in the range represents the oldest data, and will be
+coloured red in the HTML; the second age represents the newest,
+coloured green. If the second age is not specified, it will default
+to zero (so that green means data which has been accessed \e{just
+now}).
+
+For example, \cw{-r 2y} will mark data in red if it has been unused
+for two years or more, and green if it has been accessed just now.
+\cw{-r 2y-3m} will similarly mark data red if it has been unused for
+two years or more, but will mark it green if it has been accessed
+three months ago or later.
+
+}
+
+\dt \cw{--address} \e{addr}[\cw{:}\e{port}]
+
+\dd Specifies the network address and port number on which
+\cw{agedu} should listen when running its web server. If you want
+\cw{agedu} to listen for connections coming in from any source, you
+should probably specify the special IP address \cw{0.0.0.0}. If the
+port number is omitted, it will be assumed to be 80 (for which
+\cw{agedu} will probably need to be running as a privileged user).
+
+\lcont{
+
+If you specify this option, \cw{agedu} will not print its URL on
+standard output (since you are expected to know what address you
+told it to listen to).
+
+}
+
+\dt \cw{--auth} \e{auth-type}
+
+\dd Specifies how \cw{agedu} should control access to the web pages
+it serves. The options are as follows:
+
+\lcont{
+
+\dt \cw{magic}
+
+\dd This option only works on Linux, and only when the incoming
+connection is from the same machine that \cw{agedu} is running on.
+On Linux, the special file \cw{/proc/net/tcp} contains a list of
+network connections currently known to the operating system kernel,
+including which user id created them. So \cw{agedu} will look up
+each incoming connection in that file, and allow access if it comes
+from the same user id under which \cw{agedu} itself is running.
+Therefore, in \cw{agedu}'s normal web server mode, you can safely
+run it on a multi-user machine and no other user will be able to
+read data out of your index file.
+
+\dt \cw{basic}
+
+\dd In this mode, \cw{agedu} will use HTTP Basic authentication: the
+user will have to provide a username and password via their browser.
+\cw{agedu} will normally make up a username and password for the
+purpose, but you can specify your own; see below.
+
+\dt \cw{none}
+
+\dd In this mode, the web server is unauthenticated: anyone
+connecting to it has full access to the reports generated by
+\cw{agedu}. Do not do this unless there is nothing confidential at
+all in your index file, or unless you are certain that nobody but
+you can run processes on your computer.
+
+\dt \cw{default}
+
+\dd This is the default mode if you do not specify one of the above.
+In this mode, \cw{agedu} will attempt to use Linux magic
+authentication, but if it detects at startup time that
+\cw{/proc/net/tcp} is absent or non-functional then it will fall
+back to using HTTP Basic authentication and invent a user name and
+password.
+
+}
+
+\dt \cw{--auth-file} \e{filename} or \cw{--auth-fd} \e{fd}
+
+\dd When \cw{agedu} is using HTTP Basic authentication, these
+options allow you to specify your own user name and password. If you
+specify \cw{--auth-file}, these will be read from the specified
+file; if you specify \cw{--auth-fd} they will instead be read from a
+given file descriptor which you should have arranged to pass to
+\cw{agedu}. In either case, the authentication details should
+consist of the username, followed by a colon, followed by the
+password, followed \e{immediately} by end of file (no trailing
+newline, or else it will be considered part of the password).
+
+\U LIMITATIONS
+
+The data file is pretty large. The core of \cw{agedu} is the
+tree-based data structure it uses in its index in order to
+efficiently perform the queries it needs; this data structure
+requires \cw{O(N log N)} storage. This is larger than you might
+expect; a scan of my own home directory, containing half a million
+files and directories and about 20Gb of data, produced an index file
+nearly a third of a Gb in size. Furthermore, since the data file
+must be memory-mapped during most processing, it can never grow
+larger than available address space, which means that any use of
+\cw{agedu} on a seriously large file system is probably going to
+have to be done on a 64-bit computer.
+
+Also, \cw{agedu} has not yet been \e{tested} on a 64-bit computer.
+
+The data structure also does not usefully permit access control
+within the data file, so it would be difficult \dash even given the
+willingness to do additional coding \dash to run a system-wide
+\cw{agedu} scan on a \cw{cron} job and serve the right subset of
+reports to each user.
+
+\U LICENCE
+
+\cw{agedu} is free software, distributed under the MIT licence. Type
+\cw{agedu --licence} to see the full licence text.
+
+\versionid $Id$

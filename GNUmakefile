@@ -20,10 +20,22 @@ ALLMODULES := $(sort $(AGEDU_MODULES))
 ALLOBJS := $(patsubst %,%.o,$(ALLMODULES))
 ALLDEPS := $(patsubst %,%.d,$(ALLMODULES))
 
-binaries: agedu
+BINARIES = agedu
 
-agedu: $(AGEDU_OBJS)
+binaries: $(BINARIES)
+
+agedu: config.h $(AGEDU_OBJS)
 	gcc $(LFLAGS) -o agedu $(AGEDU_OBJS)
+
+config.h: configure
+	./configure
+	rm -f Makefile # we keep using _this_ Makefile
+
+configure: configure.ac
+	aclocal
+	autoconf
+	autoheader
+	automake -a --foreign
 
 INTERNALFLAGS=#
 
@@ -38,6 +50,12 @@ $(MANPAGES): %.1: %.but
 	halibut --man=$*.1 $*.but
 
 clean:
-	rm -f agedu $(ALLOBJS) $(ALLDEPS)
+	rm -f $(ALLOBJS) $(ALLDEPS) $(MANPAGES) $(BINARIES)
+
+spotless: clean
+	rm -f config.h config.h.in config.log config.status configure
+	rm -f depcomp install-sh missing stamp-h1
+	rm -f Makefile.in aclocal.m4
+	rm -rf autom4te.cache .deps
 
 -include $(ALLDEPS)

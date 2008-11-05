@@ -2,26 +2,24 @@
  * du.c: implementation of du.h.
  */
 
-#include "agedu.h" /* for config.h */
-
-#ifdef HAVE_FEATURES_H
-#define _GNU_SOURCE
-#include <features.h>
-#endif
-
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <errno.h>
-
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
+#include "agedu.h"
 #include "du.h"
 #include "alloc.h"
 
 #if !defined __linux__ || defined HAVE_FDOPENDIR
+
+#ifdef HAVE_DIRENT_H
+#  include <dirent.h>
+#endif
+#ifdef HAVE_NDIR_H
+#  include <ndir.h>
+#endif
+#ifdef HAVE_SYS_DIR_H
+#  include <sys/dir.h>
+#endif
+#ifdef HAVE_SYS_NDIR_H
+#  include <sys/ndir.h>
+#endif
 
 /*
  * Wrappers around POSIX opendir, readdir and closedir, which
@@ -29,7 +27,6 @@
  * circumstances.
  */
 
-#include <dirent.h>
 typedef DIR *dirhandle;
 
 int open_dir(const char *path, dirhandle *dh)
@@ -106,8 +103,6 @@ void close_dir(dirhandle *dh)
  */
 
 #define __KERNEL__
-#include <unistd.h>
-#include <fcntl.h>
 #include <linux/types.h>
 #include <linux/dirent.h>
 #include <linux/unistd.h>

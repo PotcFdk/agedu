@@ -2,24 +2,6 @@
  * httpd.c: implementation of httpd.h.
  */
 
-#define _GNU_SOURCE
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <assert.h>
-#include <unistd.h>
-#include <pwd.h>
-#include <ctype.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <fcntl.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <syslog.h>
-
 #include "agedu.h"
 #include "alloc.h"
 #include "html.h"
@@ -581,7 +563,9 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
      */
     while (1) {
 	fd_set rfds, wfds;
-	int i, j, maxfd, ret;
+	int i, j;
+	SELECT_TYPE_ARG1 maxfd;
+	int ret;
 
 #define FD_SET_MAX(fd, set, max) \
         do { FD_SET((fd),(set)); (max) = ((max)<=(fd)?(fd)+1:(max)); } while(0)
@@ -630,7 +614,9 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
 	}
 	nfds = i;
 
-        ret = select(maxfd, &rfds, &wfds, NULL, NULL);
+        ret = select(maxfd, SELECT_TYPE_ARG234 &rfds,
+		     SELECT_TYPE_ARG234 &wfds, SELECT_TYPE_ARG234 NULL,
+		     SELECT_TYPE_ARG5 NULL);
 	if (ret <= 0) {
 	    if (ret < 0 && (errno != EINTR)) {
 		fprintf(stderr, "select: %s", strerror(errno));

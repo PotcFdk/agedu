@@ -2,25 +2,8 @@
  * Main program for agedu.
  */
 
-#define _GNU_SOURCE
-#include <stdio.h>
-#include <errno.h>
-#include <stdarg.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
-#include <time.h>
-#include <assert.h>
-
-#include <unistd.h>
-#include <sys/types.h>
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <termios.h>
-#include <sys/ioctl.h>
-#include <fnmatch.h>
-
 #include "agedu.h"
+
 #include "du.h"
 #include "trie.h"
 #include "index.h"
@@ -1033,8 +1016,8 @@ int main(int argc, char **argv)
 		    return 1;
 		}
 
-		printf("Built pathname index, %d entries, %ju bytes\n", count,
-		       (intmax_t)st.st_size);
+		printf("Built pathname index, %d entries, %llu bytes\n", count,
+		       (unsigned long long)st.st_size);
 
 		totalsize = index_compute_size(st.st_size, count);
 
@@ -1047,8 +1030,8 @@ int main(int argc, char **argv)
 		    return 1;
 		}
 
-		printf("Upper bound on index file size = %ju bytes\n",
-		       (intmax_t)totalsize);
+		printf("Upper bound on index file size = %llu bytes\n",
+		       (unsigned long long)totalsize);
 
 		mappedfile = mmap(NULL, totalsize, PROT_READ|PROT_WRITE,MAP_SHARED, fd, 0);
 		if (!mappedfile) {
@@ -1073,7 +1056,8 @@ int main(int argc, char **argv)
 		munmap(mappedfile, totalsize);
 		ftruncate(fd, realsize);
 		close(fd);
-		printf("Actual index file size = %ju bytes\n", (intmax_t)realsize);
+		printf("Actual index file size = %llu bytes\n",
+		       (unsigned long long)realsize);
 	    }
 	} else if (mode == TEXT) {
 	    char *querydir = actions[action].arg;

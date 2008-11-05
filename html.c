@@ -2,15 +2,6 @@
  * html.c: implementation of html.h.
  */
 
-#include <assert.h>
-#include <stddef.h>
-#include <string.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <limits.h>
-#include <time.h>
-
 #include "agedu.h"
 #include "html.h"
 #include "alloc.h"
@@ -36,9 +27,16 @@ static void vhtprintf(struct html *ctx, char *fmt, va_list ap)
 {
     va_list ap2;
     int size, size2;
+    char testbuf[2];
 
     va_copy(ap2, ap);
-    size = vsnprintf(NULL, 0, fmt, ap2);
+    /*
+     * Some C libraries (Solaris, I'm looking at you) don't like
+     * an output buffer size of zero in vsnprintf, but will return
+     * sensible values given any non-zero buffer size. Hence, we
+     * use testbuf to gauge the length of the string.
+     */
+    size = vsnprintf(testbuf, 1, fmt, ap2);
     va_end(ap2);
 
     if (ctx->buflen + size >= ctx->bufsize) {

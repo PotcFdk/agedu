@@ -1,4 +1,4 @@
-# autoconf input for agedu.
+# autoconf input for agedu. -*- sh -*-
 
 AC_INIT([agedu], [6.66], [anakin@pobox.com])
 AC_CONFIG_SRCDIR([agedu.c])
@@ -17,7 +17,7 @@ AC_PROG_INSTALL
 AC_HEADER_DIRENT
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS([arpa/inet.h fcntl.h features.h limits.h netinet/in.h stddef.h stdint.h stdlib.h string.h sys/ioctl.h sys/socket.h syslog.h termios.h unistd.h])
+AC_CHECK_HEADERS([assert.h arpa/inet.h ctype.h errno.h fcntl.h features.h fnmatch.h limits.h netinet/in.h pwd.h stdarg.h stddef.h stdint.h stdio.h stdlib.h string.h sys/ioctl.h sys/mman.h sys/socket.h syslog.h termios.h time.h unistd.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -33,6 +33,9 @@ AC_FUNC_SELECT_ARGTYPES
 AC_FUNC_STRFTIME
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([ftruncate fdopendir inet_ntoa lstat64 memchr munmap select socket strcasecmp strchr strcspn strerror strrchr strspn strtoul strtoull])
+
+AC_SEARCH_LIBS(connect, socket nsl)
+# AC_SEARCH_LIBS(gethostbyname, socket nsl resolv)
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

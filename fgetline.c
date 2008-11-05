@@ -2,9 +2,7 @@
  * fgetline.c: implementation of fgetline.h.
  */
 
-#include <stdio.h>
-#include <string.h>
-
+#include "agedu.h"
 #include "alloc.h"
 #include "fgetline.h"
 

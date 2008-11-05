@@ -2,15 +2,6 @@
  * trie.c: implementation of trie.h.
  */
 
-#include <assert.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <errno.h>
-
-#include <sys/types.h>
-#include <unistd.h>
-
 #include "agedu.h"
 #include "alloc.h"
 #include "trie.h"

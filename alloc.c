@@ -2,13 +2,6 @@
  * alloc.c: implementation of alloc.h
  */
 
-#include <stdlib.h>
-#include <string.h>
-#include <stdarg.h>
-#include <time.h>
-#include <assert.h>
-#include <stdio.h>
-
 #include "agedu.h"
 #include "alloc.h"
 

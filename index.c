@@ -2,10 +2,7 @@
  * index.c: Implementation of index.h.
  */
 
-#include <assert.h>
-#include <stdio.h>
-#include <stddef.h>
-
+#include "agedu.h"
 #include "trie.h"
 #include "index.h"
 #include "alloc.h"

@@ -278,10 +278,10 @@ char *got_data(struct connctx *ctx, char *data, int length,
 	}
 
 	if (!magic_access && !auth_correct) {
-	    if (auth_string && !auth_provided) {
+	    if (auth_string) {
 		ret = http_error("401", "Unauthorized",
 				 "WWW-Authenticate: Basic realm=\""PNAME"\"\r",
-				 "\nPlease authenticate to view these pages.");
+				 "\nYou must authenticate to view these pages.");
 	    } else {
 		ret = http_error("403", "Forbidden", NULL,
 				 "This is a restricted-access set of pages.");

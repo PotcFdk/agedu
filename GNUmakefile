@@ -28,7 +28,7 @@ agedu: config.h $(AGEDU_OBJS)
 	gcc $(LFLAGS) -o agedu $(AGEDU_OBJS)
 
 config.h: configure
-	./configure
+	./configure -q
 	rm -f Makefile # we keep using _this_ Makefile
 
 configure: configure.ac

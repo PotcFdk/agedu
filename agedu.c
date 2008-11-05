@@ -1097,6 +1097,8 @@ int main(int argc, char **argv)
 		querydir[--pathlen] = '\0';
 
 	    text_query(mappedfile, querydir, textcutoff, tqdepth);
+
+	    munmap(mappedfile, totalsize);
 	} else if (mode == HTML) {
 	    char *querydir = actions[action].arg;
 	    size_t pathlen;
@@ -1136,6 +1138,8 @@ int main(int argc, char **argv)
 	    cfg.newest = htmlnewest;
 	    html = html_query(mappedfile, xi, &cfg);
 	    fputs(html, stdout);
+
+	    munmap(mappedfile, totalsize);
 	} else if (mode == DUMP) {
 	    size_t maxpathlen;
 	    char *buf;
@@ -1166,6 +1170,8 @@ int main(int argc, char **argv)
 	    while ((tf = triewalk_next(tw, buf)) != NULL)
 		dump_line(buf, tf);
 	    triewalk_free(tw);
+
+	    munmap(mappedfile, totalsize);
 	} else if (mode == HTTPD) {
 	    struct html_config pcfg;
 	    struct httpd_config dcfg;
@@ -1196,6 +1202,7 @@ int main(int argc, char **argv)
 	    pcfg.oldest = htmloldest;
 	    pcfg.newest = htmlnewest;
 	    run_httpd(mappedfile, auth, &dcfg, &pcfg);
+	    munmap(mappedfile, totalsize);
 	} else if (mode == REMOVE) {
 	    if (remove(filename) < 0) {
 		fprintf(stderr, "%s: %s: remove: %s\n", PNAME, filename,

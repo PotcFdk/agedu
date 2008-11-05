@@ -1,9 +1,6 @@
 TODO list for agedu
 ===================
 
- - we should munmap in all operating modes where we mmapped,
-   otherwise chaining them will run out of address space
-
  - we could still be using more of the information coming from
    autoconf. Our config.h is defining a whole bunch of HAVE_FOOs for
    particular functions (e.g. HAVE_INET_NTOA, HAVE_MEMCHR,

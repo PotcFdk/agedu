@@ -2,8 +2,12 @@
  * du.c: implementation of du.h.
  */
 
+#include "agedu.h" /* for config.h */
+
+#ifdef HAVE_FEATURES_H
 #define _GNU_SOURCE
 #include <features.h>
+#endif
 
 #include <stdio.h>
 #include <string.h>
@@ -14,7 +18,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "agedu.h"
 #include "du.h"
 #include "alloc.h"
 

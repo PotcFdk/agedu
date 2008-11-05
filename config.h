@@ -13,3 +13,4 @@
  */
 
 #define HAVE_LSTAT64
+#define HAVE_FEATURES_H

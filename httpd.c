@@ -403,7 +403,7 @@ static void base64_encode_atom(unsigned char *data, int n, char *out)
 void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
 	       const struct html_config *incfg)
 {
-    int fd;
+    int fd, ret;
     int authtype;
     char *authstring = NULL;
     unsigned long ipaddr;
@@ -432,12 +432,24 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
 	ipaddr += (1 + rand() % 255);
 	addr.sin_addr.s_addr = htonl(ipaddr);
 	addr.sin_port = htons(0);
+	
     } else {
 	addr.sin_addr.s_addr = inet_addr(dcfg->address);
-	addr.sin_port = dcfg->port ? htons(dcfg->port) : 80;
+	addr.sin_port = dcfg->port ? htons(dcfg->port) : 0;
     }
     addrlen = sizeof(addr);
-    if (bind(fd, (struct sockaddr *)&addr, addrlen) < 0) {
+    ret = bind(fd, (const struct sockaddr *)&addr, addrlen);
+    if (ret < 0 && errno == EADDRNOTAVAIL && !dcfg->address) {
+	/*
+	 * Some systems don't like us binding to random weird
+	 * localhost-space addresses. Try again with the official
+	 * INADDR_LOOPBACK.
+	 */
+	addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+	addr.sin_port = htons(0);
+	ret = bind(fd, (const struct sockaddr *)&addr, addrlen);
+    }
+    if (ret < 0) {
 	fprintf(stderr, "bind: %s\n", strerror(errno));
 	exit(1);
     }
@@ -537,13 +549,13 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
 	fprintf(stderr, PNAME ": authentication method not supported\n");
 	exit(1);
     }
-    if (!dcfg->address) {
-	if (ntohs(addr.sin_port) == 80) {
-	    printf("URL: http://%s/\n", inet_ntoa(addr.sin_addr));
-	} else {
-	    printf("URL: http://%s:%d/\n",
-		   inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
-	}
+    if (ntohs(addr.sin_addr.s_addr) == INADDR_ANY) {
+	printf("Server port: %d\n", ntohs(addr.sin_port));
+    } else if (ntohs(addr.sin_port) == 80) {
+	printf("URL: http://%s/\n", inet_ntoa(addr.sin_addr));
+    } else {
+	printf("URL: http://%s:%d/\n",
+	       inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
     }
 
     /*
@@ -589,6 +601,8 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
 
 	    switch (fds[i].type) {
 	      case FD_CLIENT:
+		FD_SET_MAX(fds[i].fd, &rfds, maxfd);
+		break;
 	      case FD_LISTENER:
 		FD_SET_MAX(fds[i].fd, &rfds, maxfd);
 		break;

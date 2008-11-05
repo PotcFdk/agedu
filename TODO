@@ -1,19 +1,6 @@
 TODO list for agedu
 ===================
 
- - adjust the default web server address selection.
-    + some systems (e.g. OS X) don't like us binding to random
-      localhost addresses. So if that fails, try falling back to
-      127.0.0.1 proper (and a randomly selected port) before giving
-      up.
-    + since binding to port 80 isn't generally feasible, we should
-      adjust the default behaviour when the user specifies --addr
-      with no port: it should select port zero, and then print the
-      port number on standard output. (Possibly also print the URL
-      as usual, in that situation: translate INADDR_ANY to
-      INADDR_LOOPBACK and then do the same as when we made the
-      entire address up ourself.)
-
  - we should munmap in all operating modes where we mmapped,
    otherwise chaining them will run out of address space
 

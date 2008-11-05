@@ -481,8 +481,8 @@ three months ago or later.
 \cw{agedu} should listen when running its web server. If you want
 \cw{agedu} to listen for connections coming in from any source, you
 should probably specify the special IP address \cw{0.0.0.0}. If the
-port number is omitted, it will be assumed to be 80 (for which
-\cw{agedu} will probably need to be running as a privileged user).
+port number is omitted, an arbitrary unused port will be chosen for
+you and displayed.
 
 \lcont{
 

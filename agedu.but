@@ -443,6 +443,20 @@ complexity.)
 
 }
 
+\dt \cw{--mtime}
+
+\dd This option causes \cw{agedu} to index files by their last
+modification time instead of their last access time. You might want
+to use this if your last access times were completely useless for
+some reason: for example, if you had recently searched every file on
+your system, the system would have lost all the information about
+what files you hadn't recently accessed before then. Using this
+option is liable to be less effective at finding genuinely wasted
+space than the normal mode (that is, it will be more likely to flag
+things as disused when they're not, so you will have more candidates
+to go through by hand looking for data you don't need), but may be
+better than nothing if your last-access times are unhelpful.
+
 The following options affect the web server mode \cw{-w}, and in one
 case also the stand-along HTML generation mode \cw{-H}:
 

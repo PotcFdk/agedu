@@ -49,6 +49,7 @@ struct ctx {
     struct inclusion_exclusion *inex;
     int ninex;
     int crossfs;
+    int usemtime;
     int fakeatimes;
 };
 
@@ -86,7 +87,7 @@ static int gotdata(void *vctx, const char *pathname, const STRUCT_STAT *st)
 	return 0;
 
     file.size = (unsigned long long)512 * st->st_blocks;
-    if (ctx->fakeatimes && S_ISDIR(st->st_mode))
+    if (ctx->usemtime || (ctx->fakeatimes && S_ISDIR(st->st_mode)))
 	file.atime = st->st_mtime;
     else
 	file.atime = st->st_atime;
@@ -299,6 +300,8 @@ static void text_query(const void *mappedfile, const char *querydir,
         HELPOPT("[--scan,--load] keep real atimes on directories") \
     NOVAL(NODIRATIME) LONG(no_dir_atime) LONG(no_dir_atimes) \
         HELPOPT("[--scan,--load] fake atimes on directories") \
+    NOVAL(MTIME) LONG(mtime) \
+        HELPOPT("[--scan] use mtime instead of atime") \
     VAL(AGERANGE) SHORT(r) LONG(age_range) LONG(range) LONG(ages) \
         HELPARG("age[-age]") HELPOPT("[--web,--html] set limits of colour coding") \
     VAL(SERVERADDR) LONG(address) LONG(addr) LONG(server_address) \
@@ -460,6 +463,7 @@ int main(int argc, char **argv)
     int crossfs = 0;
     int tqdepth = 1;
     int fakediratimes = 1;
+    int mtime = 0;
 
 #ifdef DEBUG_MAD_OPTION_PARSING_MACROS
     {
@@ -710,6 +714,9 @@ int main(int argc, char **argv)
 		  case OPT_NODIRATIME:
 		    fakediratimes = 1;
 		    break;
+		  case OPT_MTIME:
+		    mtime = 1;
+		    break;
 		  case OPT_DATAFILE:
 		    filename = optval;
 		    break;
@@ -912,6 +919,7 @@ int main(int argc, char **argv)
 	    ctx->ninex = ninex;
 	    ctx->crossfs = crossfs;
 	    ctx->fakeatimes = fakediratimes;
+	    ctx->usemtime = mtime;
 
 	    ctx->last_output_update = time(NULL);
 

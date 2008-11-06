@@ -887,7 +887,8 @@ int main(int argc, char **argv)
 		/*
 		 * Prepare to write out the index file.
 		 */
-		fd = open(filename, O_RDWR | O_TRUNC | O_CREAT, S_IRWXU);
+		fd = open(filename, O_RDWR | O_TRUNC | O_CREAT,
+			  S_IRUSR | S_IWUSR);
 		if (fd < 0) {
 		    fprintf(stderr, "%s: %s: open: %s\n", PNAME, filename,
 			    strerror(errno));

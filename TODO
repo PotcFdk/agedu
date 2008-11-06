@@ -1,6 +1,15 @@
 TODO list for agedu
 ===================
 
+ - stop trying to calculate an upper bound on the index file size.
+   Instead, just mmap it at initial size + delta, and periodically
+   re-mmap it during index building if it grows too big. If we run
+   out of address space, we'll hear about it eventually; and
+   computing upper bounds given the new optimised index tends to be
+   a factor of five out, which is bad because it'll lead to running
+   out of theoretical address space and erroneously reporting
+   failure long before we run out of it for real.
+
  - we could still be using more of the information coming from
    autoconf. Our config.h is defining a whole bunch of HAVE_FOOs for
    particular functions (e.g. HAVE_INET_NTOA, HAVE_MEMCHR,
@@ -13,16 +22,6 @@ TODO list for agedu
     + however, I don't see anything here that looks very
       controversial; IIRC it's all in POSIX, for one thing. So more
       likely this should simply wait until somebody complains.
-
- - it would be useful to support a choice of indexing strategies.
-   The current system's tradeoff of taking O(N log N) space in order
-   to be able to support any age cutoff you like is not going to be
-   ideal for everybody. A second more conventional mechanism which
-   allows the user to specify a number of fixed cutoffs and just
-   indexes each directory on those alone would undoubtedly be a
-   useful thing for large-scale users. This will require
-   considerable thought about how to make the indexers pluggable at
-   both index-generation time and query time.
 
  - IPv6 support in the HTTP server
     * of course, Linux magic auth can still work in this context; we
@@ -70,3 +69,17 @@ TODO list for agedu
       agedu dump file on standard output. Then one would simply feed
       that over the network connection of one's choice to the rest
       of agedu running on Unix as usual.
+
+ - it might conceivably be useful to support a choice of indexing
+   strategies. The current "continuous index" mechanism' tradeoff of
+   taking O(N log N) space in order to be able to support any age
+   cutoff you like is not going to be ideal for everybody. A second
+   more conventional "discrete index" mechanism which allows the
+   user to specify a number of fixed cutoffs and just indexes each
+   directory on those alone would undoubtedly be a useful thing for
+   large-scale users. This will require considerable thought about
+   how to make the indexers pluggable at both index-generation time
+   and query time.
+    * however, now we have the cut-down version of the continuous
+      index, it might be the case that the space gain is no longer
+      worthwhile.

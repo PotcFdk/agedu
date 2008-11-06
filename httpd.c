@@ -269,16 +269,22 @@ char *got_data(struct connctx *ctx, char *data, int length,
 				 "This is a restricted-access set of pages.");
 	    }
 	} else {
+	    char *q;
 	    p = ctx->url;
 	    p += strspn(p, "/?");
-	    index = strtoul(p, NULL, 10);
-	    document = html_query(ctx->t, index, cfg);
-	    if (document) {
-		ret = http_success("text/html", 1, document);
-		sfree(document);
-	    } else {
+	    index = strtoul(p, &q, 10);
+	    if (*q) {
 		ret = http_error("404", "Not Found", NULL,
-				 "Pathname index out of range.");
+				 "This is not a valid pathname index.");
+	    } else {
+		document = html_query(ctx->t, index, cfg);
+		if (document) {
+		    ret = http_success("text/html", 1, document);
+		    sfree(document);
+		} else {
+		    ret = http_error("404", "Not Found", NULL,
+				     "Pathname index out of range.");
+		}
 	    }
 	}
 	return ret;
@@ -362,9 +368,11 @@ int check_owning_uid(int fd, int flip)
 	while (fgets(linebuf, sizeof(linebuf), fp)) {
 	    if (strlen(linebuf) >= 75 &&
 		!strncmp(linebuf+6, matchbuf, strlen(matchbuf))) {
+		fclose(fp);
 		return atoi(linebuf + 75);
 	    }
 	}
+	fclose(fp);
     }
 
     return -1;

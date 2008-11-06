@@ -258,7 +258,13 @@ void indexbuild_add(indexbuild *ib, const struct trie_file *tf)
 {
     off_t node = OFFSET(ib->t, tf);
     ib->currroot = avl_insert(ib, ib->currroot, node);
-    ib->roots[ib->n++] = OFFSET(ib->t, ib->currroot);
+    ib->roots[ib->n++] = 0;
+}
+
+void indexbuild_tag(indexbuild *ib)
+{
+    if (ib->n > 0)
+	ib->roots[ib->n - 1] = OFFSET(ib->t, ib->currroot);
     ib->firstmutable = ib->nodes + ib->nnodes;
 }
 
@@ -269,6 +275,7 @@ off_t indexbuild_realsize(indexbuild *ib)
 
 void indexbuild_free(indexbuild *ib)
 {
+    assert(ib->n == trie_count(ib->t));
     sfree(ib);
 }
 
@@ -287,6 +294,7 @@ unsigned long long index_query(const void *t, int n, unsigned long long at)
     if (n > count)
 	n = count;
 
+    assert(roots[n-1]);
     node = NODE(t, roots[n-1]);
 
     ret = 0;
@@ -318,6 +326,7 @@ unsigned long long index_order_stat(const void *t, double f)
 
     roots = (const off_t *)((const char *)t + trie_get_index_offset(t));
     count = trie_count(t);
+    assert(roots[count-1]);
     node = NODE(t, roots[count-1]);
 
     size = node->totalsize * f;

@@ -302,6 +302,8 @@ static void text_query(const void *mappedfile, const char *querydir,
         HELPOPT("[--scan,--load] fake atimes on directories") \
     NOVAL(MTIME) LONG(mtime) \
         HELPOPT("[--scan] use mtime instead of atime") \
+    NOVAL(FULL) LONG(full_index) \
+        HELPOPT("[--scan] index every file individually") \
     VAL(AGERANGE) SHORT(r) LONG(age_range) LONG(range) LONG(ages) \
         HELPARG("age[-age]") HELPOPT("[--web,--html] set limits of colour coding") \
     VAL(SERVERADDR) LONG(address) LONG(addr) LONG(server_address) \
@@ -441,7 +443,7 @@ int main(int argc, char **argv)
     void *mappedfile;
     triewalk *tw;
     indexbuild *ib;
-    const struct trie_file *tf;
+    const struct trie_file *tf, *prevtf;
     char *filename = PNAME ".dat";
     int doing_opts = 1;
     enum { TEXT, HTML, SCAN, DUMP, SCANDUMP, LOAD, HTTPD, REMOVE };
@@ -464,6 +466,7 @@ int main(int argc, char **argv)
     int tqdepth = 1;
     int fakediratimes = 1;
     int mtime = 0;
+    int fullindex = 0;
 
 #ifdef DEBUG_MAD_OPTION_PARSING_MACROS
     {
@@ -717,6 +720,9 @@ int main(int argc, char **argv)
 		  case OPT_MTIME:
 		    mtime = 1;
 		    break;
+		  case OPT_FULL:
+		    fullindex = 1;
+		    break;
 		  case OPT_DATAFILE:
 		    filename = optval;
 		    break;
@@ -869,6 +875,7 @@ int main(int argc, char **argv)
 
 	if (mode == SCAN || mode == SCANDUMP || mode == LOAD) {
 	    const char *scandir = actions[action].arg;
+
 	    if (mode == LOAD) {
 		char *buf = fgetline(stdin);
 		unsigned newpathsep;
@@ -1008,6 +1015,9 @@ int main(int argc, char **argv)
 		du(scandir, gotdata, ctx);
 	    }
 	    if (mode != SCANDUMP) {
+		size_t maxpathlen;
+		char *buf, *prevbuf;
+
 		count = triebuild_finish(ctx->tb);
 		triebuild_free(ctx->tb);
 
@@ -1055,9 +1065,78 @@ int main(int argc, char **argv)
 
 		printf("Building index\n");
 		ib = indexbuild_new(mappedfile, st.st_size, count);
+		maxpathlen = trie_maxpathlen(mappedfile);
+		buf = snewn(maxpathlen, char);
+		prevbuf = snewn(maxpathlen, char);
 		tw = triewalk_new(mappedfile);
-		while ((tf = triewalk_next(tw, NULL)) != NULL)
-		    indexbuild_add(ib, tf);
+		prevbuf[0] = '\0';
+		tf = triewalk_next(tw, buf);
+		assert(tf);
+		while (1) {
+		    int i;
+
+		    /*
+		     * Get the next file from the index. So we are
+		     * currently holding, and have not yet
+		     * indexed, prevtf (with pathname prevbuf) and
+		     * tf (with pathname buf).
+		     */
+		    prevtf = tf;
+		    memcpy(prevbuf, buf, maxpathlen);
+		    tf = triewalk_next(tw, buf);
+
+		    if (!tf)
+			buf[0] = '\0';
+
+		    /*
+		     * Find the first differing character position
+		     * between our two pathnames.
+		     */
+		    for (i = 0; prevbuf[i] && prevbuf[i] == buf[i]; i++);
+
+		    /*
+		     * If prevbuf was a directory name and buf is
+		     * something inside that directory, then
+		     * trie_before() will be called on prevbuf
+		     * itself. Hence we must drop a tag before it,
+		     * so that the resulting index is usable.
+		     */
+		    if ((!prevbuf[i] && (buf[i] == pathsep ||
+					 (i > 0 && buf[i-1] == pathsep))))
+			indexbuild_tag(ib);
+
+		    /*
+		     * Add prevtf to the index.
+		     */
+		    indexbuild_add(ib, prevtf);
+
+		    if (!tf) {
+			/*
+			 * Drop an unconditional final tag, and
+			 * get out of this loop.
+			 */
+			indexbuild_tag(ib);
+			break;
+		    }
+			
+		    /*
+		     * In full-index mode, index everything.
+		     */
+		    if (fullindex)
+			indexbuild_tag(ib);
+
+		    /*
+		     * If prevbuf was a filename inside some
+		     * directory which buf is outside, then
+		     * trie_before() will be called on some
+		     * pathname either equal to buf or epsilon
+		     * less than it. Either way, we're going to
+		     * need to drop a tag after prevtf.
+		     */
+		    if (strchr(prevbuf+i, pathsep) || !tf)
+			indexbuild_tag(ib);
+		}
+
 		triewalk_free(tw);
 		realsize = indexbuild_realsize(ib);
 		indexbuild_free(ib);

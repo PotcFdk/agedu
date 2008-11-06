@@ -25,6 +25,7 @@ off_t index_compute_size(off_t currentsize, int nodecount);
 typedef struct indexbuild indexbuild;
 indexbuild *indexbuild_new(void *t, off_t startoff, int nodecount);
 void indexbuild_add(indexbuild *ib, const struct trie_file *tf);
+void indexbuild_tag(indexbuild *ib);
 off_t indexbuild_realsize(indexbuild *ib);
 void indexbuild_free(indexbuild *ib);
 

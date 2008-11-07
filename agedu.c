@@ -320,8 +320,6 @@ static void text_query(const void *mappedfile, const char *querydir,
         HELPOPT("[--scan,--load] fake atimes on directories") \
     NOVAL(MTIME) LONG(mtime) \
         HELPOPT("[--scan] use mtime instead of atime") \
-    NOVAL(FULL) LONG(full_index) \
-        HELPOPT("[--scan] index every file individually") \
     VAL(AGERANGE) SHORT(r) LONG(age_range) LONG(range) LONG(ages) \
         HELPARG("age[-age]") HELPOPT("[--web,--html] set limits of colour coding") \
     VAL(SERVERADDR) LONG(address) LONG(addr) LONG(server_address) \
@@ -484,7 +482,6 @@ int main(int argc, char **argv)
     int tqdepth = 1;
     int fakediratimes = 1;
     int mtime = 0;
-    int fullindex = 0;
 
 #ifdef DEBUG_MAD_OPTION_PARSING_MACROS
     {
@@ -737,9 +734,6 @@ int main(int argc, char **argv)
 		    break;
 		  case OPT_MTIME:
 		    mtime = 1;
-		    break;
-		  case OPT_FULL:
-		    fullindex = 1;
 		    break;
 		  case OPT_DATAFILE:
 		    filename = optval;
@@ -1034,6 +1028,7 @@ int main(int argc, char **argv)
 	    }
 	    if (mode != SCANDUMP) {
 		size_t maxpathlen;
+		size_t delta;
 		char *buf, *prevbuf;
 
 		count = triebuild_finish(ctx->tb);
@@ -1053,10 +1048,12 @@ int main(int argc, char **argv)
 		    return 1;
 		}
 
-		printf("Built pathname index, %d entries, %llu bytes\n", count,
+		printf("Built pathname index, %d entries,"
+		       " %llu bytes of index\n", count,
 		       (unsigned long long)st.st_size);
 
-		totalsize = index_compute_size(st.st_size, count);
+		totalsize = index_initial_size(st.st_size, count);
+		totalsize += totalsize / 10;
 
 		if (lseek(fd, totalsize-1, SEEK_SET) < 0) {
 		    perror(PNAME ": lseek");
@@ -1066,9 +1063,6 @@ int main(int argc, char **argv)
 		    perror(PNAME ": write");
 		    return 1;
 		}
-
-		printf("Upper bound on index file size = %llu bytes\n",
-		       (unsigned long long)totalsize);
 
 		mappedfile = mmap(NULL, totalsize, PROT_READ|PROT_WRITE,MAP_SHARED, fd, 0);
 		if (!mappedfile) {
@@ -1082,7 +1076,7 @@ int main(int argc, char **argv)
 		}
 
 		printf("Building index\n");
-		ib = indexbuild_new(mappedfile, st.st_size, count);
+		ib = indexbuild_new(mappedfile, st.st_size, count, &delta);
 		maxpathlen = trie_maxpathlen(mappedfile);
 		buf = snewn(maxpathlen, char);
 		prevbuf = snewn(maxpathlen, char);
@@ -1092,6 +1086,34 @@ int main(int argc, char **argv)
 		assert(tf);
 		while (1) {
 		    int i;
+
+		    if (totalsize - indexbuild_realsize(ib) < delta) {
+			/*
+			 * Unmap the file, grow it, and remap it.
+			 */
+			munmap(mappedfile, totalsize);
+
+			totalsize += delta;
+			totalsize += totalsize / 10;
+
+			if (lseek(fd, totalsize-1, SEEK_SET) < 0) {
+			    perror(PNAME ": lseek");
+			    return 1;
+			}
+			if (write(fd, "\0", 1) < 1) {
+			    perror(PNAME ": write");
+			    return 1;
+			}
+
+			mappedfile = mmap(NULL, totalsize, PROT_READ|PROT_WRITE,MAP_SHARED, fd, 0);
+			if (!mappedfile) {
+			    perror(PNAME ": mmap");
+			    return 1;
+			}
+
+			indexbuild_rebase(ib, mappedfile);
+			triewalk_rebase(tw, mappedfile);
+		    }
 
 		    /*
 		     * Get the next file from the index. So we are
@@ -1136,12 +1158,6 @@ int main(int argc, char **argv)
 			indexbuild_tag(ib);
 			break;
 		    }
-			
-		    /*
-		     * In full-index mode, index everything.
-		     */
-		    if (fullindex)
-			indexbuild_tag(ib);
 
 		    /*
 		     * If prevbuf was a filename inside some
@@ -1162,7 +1178,7 @@ int main(int argc, char **argv)
 		munmap(mappedfile, totalsize);
 		ftruncate(fd, realsize);
 		close(fd);
-		printf("Actual index file size = %llu bytes\n",
+		printf("Final index file size = %llu bytes\n",
 		       (unsigned long long)realsize);
 	    }
 	} else if (mode == TEXT) {

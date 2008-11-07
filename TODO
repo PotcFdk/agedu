@@ -1,15 +1,6 @@
 TODO list for agedu
 ===================
 
- - stop trying to calculate an upper bound on the index file size.
-   Instead, just mmap it at initial size + delta, and periodically
-   re-mmap it during index building if it grows too big. If we run
-   out of address space, we'll hear about it eventually; and
-   computing upper bounds given the new optimised index tends to be
-   a factor of five out, which is bad because it'll lead to running
-   out of theoretical address space and erroneously reporting
-   failure long before we run out of it for real.
-
  - we could still be using more of the information coming from
    autoconf. Our config.h is defining a whole bunch of HAVE_FOOs for
    particular functions (e.g. HAVE_INET_NTOA, HAVE_MEMCHR,
@@ -81,5 +72,4 @@ TODO list for agedu
    how to make the indexers pluggable at both index-generation time
    and query time.
     * however, now we have the cut-down version of the continuous
-      index, it might be the case that the space gain is no longer
-      worthwhile.
+      index, the space saving is less compelling.

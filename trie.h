@@ -110,6 +110,7 @@ unsigned long trie_count(const void *t);
 typedef struct triewalk triewalk;
 triewalk *triewalk_new(const void *t);
 const struct trie_file *triewalk_next(triewalk *tw, char *buf);
+void triewalk_rebase(triewalk *tw, const void *t);
 void triewalk_free(triewalk *tw);
 
 /* ----------------------------------------------------------------------

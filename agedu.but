@@ -572,11 +572,13 @@ efficiently perform the queries it needs; this data structure
 requires \cw{O(N log N)} storage. This is larger than you might
 expect; a scan of my own home directory, containing half a million
 files and directories and about 20Gb of data, produced an index file
-nearly a third of a Gb in size. Furthermore, since the data file
-must be memory-mapped during most processing, it can never grow
-larger than available address space, which means that any use of
-\cw{agedu} on a file system more than about ten times the above size
-is probably going to have to be done on a 64-bit computer.
+over 60Mb in size. Furthermore, since the data file must be
+memory-mapped during most processing, it can never grow larger than
+available address space, so a \em{really} big filesystem may need to
+be indexed on a 64-bit computer. (This is one reason for the
+existence of the \cw{-D} and \cw{-L} options: you can do the
+scanning on the machine with access to the filesystem, and the
+indexing on a machine big enough to handle it.)
 
 The data structure also does not usefully permit access control
 within the data file, so it would be difficult \dash even given the

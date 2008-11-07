@@ -20,9 +20,13 @@ struct avlnode {
     unsigned long long totalsize;
 };
 
-static int index_navlnodes(int nodecount)
+/*
+ * Determine the maximum depth of an AVL tree containing a certain
+ * number of nodes.
+ */
+static int index_maxdepth(int nodecount)
 {
-    int b, c, maxdepth, ret;
+    int b, c, maxdepth;
 
     /*
      * Model the tree growing at maximum imbalance. We do this by
@@ -30,22 +34,11 @@ static int index_navlnodes(int nodecount)
      * (i.e. smallest) tree of any given depth, and stopping when
      * that's larger than nodecount.
      */
-    ret = 0;
     maxdepth = 1;
     b = 0;
     c = 1;
     while (b <= nodecount) {
 	int tmp;
-
-	/*
-	 * A tree with at most b nodes can be at most depth
-	 * maxdepth-1. A tree with more than b but at most c can
-	 * be at most maxdepth. Therefore, for each tree size
-	 * between b and c, we might need to adjust maxdepth+1
-	 * nodes.
-	 */
-	tmp = min(c, nodecount);
-	ret += (tmp - b) * maxdepth;
 
 	tmp = 1 + b + c;
 	b = c;
@@ -53,15 +46,14 @@ static int index_navlnodes(int nodecount)
 	maxdepth++;
     }
 
-    return ret;
+    return maxdepth;
 }
 
-off_t index_compute_size(off_t currentsize, int nodecount)
+off_t index_initial_size(off_t currentsize, int nodecount)
 {
     currentsize += PADDING(currentsize, alignof(off_t));
     currentsize += nodecount + sizeof(off_t);
     currentsize += PADDING(currentsize, alignof(struct avlnode));
-    currentsize += index_navlnodes(nodecount) * sizeof(struct avlnode);
 
     return currentsize;
 }
@@ -72,7 +64,7 @@ off_t index_compute_size(off_t currentsize, int nodecount)
 
 struct indexbuild {
     void *t;
-    int n, nnodes, maxnodes;
+    int n, nnodes;
     struct avlnode *nodes;
     off_t *roots;
     struct avlnode *currroot;
@@ -87,7 +79,8 @@ struct indexbuild {
     ((node) ? (off_t)((const char *)node - (const char *)t) : 0)
 #define MAXDEPTH(node) ((node) ? (node)->maxdepth : 0)
 
-indexbuild *indexbuild_new(void *t, off_t startoff, int nodecount)
+indexbuild *indexbuild_new(void *t, off_t startoff, int nodecount,
+			   size_t *delta)
 {
     indexbuild *ib = snew(indexbuild);
 
@@ -98,10 +91,12 @@ indexbuild *indexbuild_new(void *t, off_t startoff, int nodecount)
     startoff += nodecount * sizeof(off_t);
     startoff += PADDING(startoff, alignof(struct avlnode));
     ib->nodes = (struct avlnode *)((char *)t + startoff);
-    ib->maxnodes = index_navlnodes(nodecount);
     ib->nnodes = ib->n = 0;
     ib->currroot = NULL;
     ib->firstmutable = ib->nodes + ib->nnodes;
+
+    if (delta)
+	*delta = sizeof(struct avlnode) * (1 + index_maxdepth(nodecount));
 
     return ib;
 }
@@ -117,7 +112,6 @@ static struct avlnode *avl_makemutable(indexbuild *ib, struct avlnode *n)
     if (n && n >= ib->firstmutable)
 	return n;		       /* already mutable */
 
-    assert(ib->nnodes < ib->maxnodes);
     newnode = ib->nodes + ib->nnodes++;
     if (n)
 	*newnode = *n;		       /* structure copy */
@@ -266,6 +260,17 @@ void indexbuild_tag(indexbuild *ib)
     if (ib->n > 0)
 	ib->roots[ib->n - 1] = OFFSET(ib->t, ib->currroot);
     ib->firstmutable = ib->nodes + ib->nnodes;
+}
+
+void indexbuild_rebase(indexbuild *ib, void *t)
+{
+    ptrdiff_t diff = (unsigned char *)t - (unsigned char *)(ib->t);
+
+    ib->t = t;
+    ib->nodes = (struct avlnode *)((unsigned char *)ib->nodes + diff);
+    ib->roots = (off_t *)((unsigned char *)ib->roots + diff);
+    ib->currroot = (struct avlnode *)((unsigned char *)ib->currroot + diff);
+    ib->firstmutable = (struct avlnode *)((unsigned char *)ib->firstmutable + diff);
 }
 
 off_t indexbuild_realsize(indexbuild *ib)

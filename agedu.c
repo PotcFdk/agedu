@@ -1088,6 +1088,9 @@ int main(int argc, char **argv)
 		    int i;
 
 		    if (totalsize - indexbuild_realsize(ib) < delta) {
+			const void *oldfile = mappedfile;
+			ptrdiff_t diff;
+
 			/*
 			 * Unmap the file, grow it, and remap it.
 			 */
@@ -1113,6 +1116,14 @@ int main(int argc, char **argv)
 
 			indexbuild_rebase(ib, mappedfile);
 			triewalk_rebase(tw, mappedfile);
+			diff = (const unsigned char *)mappedfile -
+			    (const unsigned char *)oldfile;
+			if (prevtf)
+			    prevtf = (const struct trie_file *)
+				(((const unsigned char *)prevtf) + diff);
+			if (tf)
+			    tf = (const struct trie_file *)
+				(((const unsigned char *)tf) + diff);
 		    }
 
 		    /*

@@ -170,7 +170,7 @@ static int str_cmp(const void *av, const void *bv)
 }
 
 static void du_recurse(char **path, size_t pathlen, size_t *pathsize,
-		       gotdata_fn_t gotdata, void *gotdata_ctx)
+		       gotdata_fn_t gotdata, err_fn_t err, void *gotdata_ctx)
 {
     const char *name;
     dirhandle d;
@@ -179,7 +179,7 @@ static void du_recurse(char **path, size_t pathlen, size_t *pathsize,
     size_t i, nnames, namesize;
 
     if (LSTAT(*path, &st) < 0) {
-	fprintf(stderr, "%s: lstat: %s\n", *path, strerror(errno));
+	err(gotdata_ctx, "%s: lstat: %s\n", *path, strerror(errno));
 	return;
     }
 
@@ -193,7 +193,7 @@ static void du_recurse(char **path, size_t pathlen, size_t *pathsize,
     nnames = namesize = 0;
 
     if (open_dir(*path, &d) < 0) {
-	fprintf(stderr, "%s: opendir: %s\n", *path, strerror(errno));
+	err(gotdata_ctx, "%s: opendir: %s\n", *path, strerror(errno));
 	return;
     }
     while ((name = read_dir(&d)) != NULL) {
@@ -231,14 +231,15 @@ static void du_recurse(char **path, size_t pathlen, size_t *pathsize,
 	    sprintf(*path + pathlen, "/%s", names[i]);
 	}
 
-	du_recurse(path, newpathlen, pathsize, gotdata, gotdata_ctx);
+	du_recurse(path, newpathlen, pathsize, gotdata, err, gotdata_ctx);
 
 	sfree(names[i]);
     }
     sfree(names);
 }
 
-void du(const char *inpath, gotdata_fn_t gotdata, void *gotdata_ctx)
+void du(const char *inpath, gotdata_fn_t gotdata, err_fn_t err,
+	void *gotdata_ctx)
 {
     char *path;
     size_t pathlen, pathsize;
@@ -248,5 +249,5 @@ void du(const char *inpath, gotdata_fn_t gotdata, void *gotdata_ctx)
     path = snewn(pathsize, char);
     strcpy(path, inpath);
 
-    du_recurse(&path, pathlen, &pathsize, gotdata, gotdata_ctx);
+    du_recurse(&path, pathlen, &pathsize, gotdata, err, gotdata_ctx);
 }

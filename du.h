@@ -18,7 +18,14 @@ typedef int (*gotdata_fn_t)(void *ctx,
 			    const struct stat64 *st);
 
 /*
+ * Function called to report an error during scanning. The ctx is
+ * the same one passed to gotdata_fn_t.
+ */
+typedef void (*err_fn_t)(void *vctx, const char *fmt, ...);
+
+/*
  * Recursively scan a directory tree and report every
  * space-consuming item in it to gotdata().
  */
-void du(const char *path, gotdata_fn_t gotdata, void *gotdata_ctx);
+void du(const char *path, gotdata_fn_t gotdata, err_fn_t err,
+	void *gotdata_ctx);

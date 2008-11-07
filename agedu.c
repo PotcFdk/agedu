@@ -140,6 +140,24 @@ static int gotdata(void *vctx, const char *pathname, const STRUCT_STAT *st)
     return 1;
 }
 
+static void scan_error(void *vctx, const char *fmt, ...)
+{
+    struct ctx *ctx = (struct ctx *)vctx;
+    va_list ap;
+
+    if (ctx->progress) {
+	fprintf(stderr, "%-*s\r", ctx->progwidth, "");
+	fflush(stderr);
+    }
+
+    fprintf(stderr, "%s: ", PNAME);
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
+
+    ctx->last_output_update--;	       /* force a progress report next time */
+}
+
 static void text_query(const void *mappedfile, const char *querydir,
 		       time_t t, int depth)
 {
@@ -1012,7 +1030,7 @@ int main(int argc, char **argv)
 		    line++;
 		}
 	    } else {
-		du(scandir, gotdata, ctx);
+		du(scandir, gotdata, scan_error, ctx);
 	    }
 	    if (mode != SCANDUMP) {
 		size_t maxpathlen;

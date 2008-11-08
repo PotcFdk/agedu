@@ -949,7 +949,9 @@ int main(int argc, char **argv)
 	    ctx->progress = progress;
 	    {
 		struct winsize ws;
-		if (progress && ioctl(2, TIOCGWINSZ, &ws) == 0)
+		if (progress &&
+		    ioctl(2, TIOCGWINSZ, &ws) == 0 &&
+		    ws.ws_col > 0)
 		    ctx->progwidth = ws.ws_col - 1;
 		else
 		    ctx->progwidth = 79;

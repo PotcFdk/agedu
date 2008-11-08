@@ -19,7 +19,8 @@ struct html {
     char *href;
     size_t hreflen;
     const char *format;
-    unsigned long long thresholds[MAXCOLOUR-1];
+    unsigned long long thresholds[MAXCOLOUR];
+    char *titletexts[MAXCOLOUR+1];
     time_t now;
 };
 
@@ -171,13 +172,10 @@ static void get_indices(const void *t, char *path,
 	path[pathlen-1] = c2;
 }
 
-static unsigned long long fetch_size(const void *t, char *path,
+static unsigned long long fetch_size(const void *t,
+				     unsigned long xi1, unsigned long xi2,
 				     unsigned long long atime)
 {
-    unsigned long xi1, xi2;
-
-    get_indices(t, path, &xi1, &xi2);
-
     return index_query(t, xi2, atime) - index_query(t, xi1, atime);
 }
 
@@ -213,7 +211,6 @@ static void begin_colour_bar(struct html *ctx)
 static void add_to_colour_bar(struct html *ctx, int colour, int pixels)
 {
     int r, g, b;
-    char buf[80];
 
     if (colour >= 0 && colour < 256)   /* red -> yellow fade */
 	r = 255, g = colour, b = 0;
@@ -222,26 +219,12 @@ static void add_to_colour_bar(struct html *ctx, int colour, int pixels)
     else			       /* background grey */
 	r = g = b = 240;
 
-    if (colour < 0) {
-	/* no title text here */
-    } else if (colour == 0) {
-	strcpy(buf, "&lt; ");
-	round_and_format_age(ctx, ctx->thresholds[0], buf+5, 0);
-    } else if (colour == MAXCOLOUR) {
-	strcpy(buf, "&gt; ");
-	round_and_format_age(ctx, ctx->thresholds[MAXCOLOUR-1], buf+5, 0);
-    } else {
-	unsigned long long midrange =
-	    (ctx->thresholds[colour] + ctx->thresholds[colour+1]) / 2;
-	round_and_format_age(ctx, midrange, buf, 0);
-    }
-
     if (pixels > 0) {
 	htprintf(ctx, "<td style=\"width:%dpx; height:1em; "
 		 "background-color:#%02x%02x%02x\"",
 		 pixels, r, g, b);
 	if (colour >= 0)
-	    htprintf(ctx, " title=\"%s\"", buf);
+	    htprintf(ctx, " title=\"%s\"", ctx->titletexts[colour]);
 	htprintf(ctx, "></td>\n");
     }
 }
@@ -300,7 +283,7 @@ static struct vector *make_vector(struct html *ctx, char *path,
 	    atime = ULLONG_MAX;
 	else
 	    atime = ctx->thresholds[i];
-	vec->sizes[i] = fetch_size(ctx->t, path, atime);
+	vec->sizes[i] = fetch_size(ctx->t, xi1, xi2, atime);
     }
 
     return vec;
@@ -492,9 +475,26 @@ char *html_query(const void *t, unsigned long index,
 	ctx->oldest = round_and_format_age(ctx, ctx->oldest, agebuf1, 0);
 	ctx->newest = round_and_format_age(ctx, ctx->newest, agebuf2, 0);
     }
-    for (i = 0; i < MAXCOLOUR-1; i++) {
+    for (i = 0; i < MAXCOLOUR; i++) {
 	ctx->thresholds[i] =
-	    ctx->oldest + (ctx->newest - ctx->oldest) * i / MAXCOLOUR;
+	    ctx->oldest + (ctx->newest - ctx->oldest) * i / (MAXCOLOUR-1);
+    }
+    for (i = 0; i <= MAXCOLOUR; i++) {
+	char buf[80];
+
+	if (i == 0) {
+	    strcpy(buf, "&lt; ");
+	    round_and_format_age(ctx, ctx->thresholds[0], buf+5, 0);
+	} else if (i == MAXCOLOUR) {
+	    strcpy(buf, "&gt; ");
+	    round_and_format_age(ctx, ctx->thresholds[MAXCOLOUR-1], buf+5, 0);
+	} else {
+	    unsigned long long midrange =
+		(ctx->thresholds[i-1] + ctx->thresholds[i]) / 2;
+	    round_and_format_age(ctx, midrange, buf, 0);
+	}
+
+	ctx->titletexts[i] = dupstr(buf);
     }
     htprintf(ctx, "<p align=center>Key to colour coding (mouse over for more detail):\n");
     htprintf(ctx, "<p align=center style=\"padding: 0; margin-top:0.4em; "
@@ -515,7 +515,8 @@ char *html_query(const void *t, unsigned long index,
      * Find the total size of our entire subdirectory. We'll use
      * that as the scale for all the colour bars in this report.
      */
-    ctx->totalsize = fetch_size(t, path, ULLONG_MAX);
+    get_indices(t, path, &xi1, &xi2);
+    ctx->totalsize = fetch_size(t, xi1, xi2, ULLONG_MAX);
 
     /*
      * Generate a report line for the whole subdirectory.

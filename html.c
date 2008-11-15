@@ -367,6 +367,18 @@ static void write_report_line(struct html *ctx, struct vector *vec)
     htprintf(ctx, "</td>\n</tr>\n");
 }
 
+int strcmptrailingpathsep(const char *a, const char *b)
+{
+    while (*a == *b && *a)
+	a++, b++;
+
+    if ((*a == pathsep && !a[1] && !*b) ||
+	(*b == pathsep && !b[1] && !*a))
+	return 0;
+
+    return (int)(unsigned char)*a - (int)(unsigned char)*b;
+}
+
 char *html_query(const void *t, unsigned long index,
 		 const struct html_config *cfg)
 {
@@ -442,7 +454,7 @@ char *html_query(const void *t, unsigned long index,
 	*zp = '\0';
 	index2 = trie_before(t, path);
 	trie_getpath(t, index2, path2);
-	if (!strcmp(path, path2) && cfg->format) {
+	if (!strcmptrailingpathsep(path, path2) && cfg->format) {
 	    snprintf(href, hreflen, cfg->format, index2);
 	    if (!*href)		       /* special case that we understand */
 		strcpy(href, "./");

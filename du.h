@@ -15,7 +15,7 @@
  */
 typedef int (*gotdata_fn_t)(void *ctx,
 			    const char *pathname,
-			    const struct stat64 *st);
+			    const STRUCT_STAT *st);
 
 /*
  * Function called to report an error during scanning. The ctx is

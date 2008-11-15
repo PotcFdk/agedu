@@ -54,6 +54,11 @@ TODO list for agedu
       Unclear what the right UI would be on Windows, too;
       command-line exactly as now might be considered just a
       _little_ unfriendly. Or perhaps not.
+       * Disk scan procedure: the FindFirstFile / FindNextFile
+	 functions to scan a directory automatically return the file
+	 times along with the filenames, so there's no need to stat
+	 them later. Would want to fiddle the shape of the
+	 abstraction layer to reflect this.
     + Alternatively, a much easier approach would be to write a
       Windows version of just the --scan-dump mode, which does a
       filesystem scan via the Windows API and generates a valid

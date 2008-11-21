@@ -6,7 +6,7 @@
 #include "du.h"
 #include "alloc.h"
 
-#if !defined __linux__ || defined HAVE_FDOPENDIR
+#if !defined __linux__ || !defined O_NOATIME || defined HAVE_FDOPENDIR
 
 #ifdef HAVE_DIRENT_H
 #  include <dirent.h>

@@ -6,8 +6,8 @@
 
 \U NAME
 
-\cw{agedu} - correlate disk usage with last-access times to identify
-large and disused data
+\cw{agedu} \dash correlate disk usage with last-access times to
+identify large and disused data
 
 \U SYNOPSIS
 
@@ -574,7 +574,7 @@ expect; a scan of my own home directory, containing half a million
 files and directories and about 20Gb of data, produced an index file
 over 60Mb in size. Furthermore, since the data file must be
 memory-mapped during most processing, it can never grow larger than
-available address space, so a \em{really} big filesystem may need to
+available address space, so a \e{really} big filesystem may need to
 be indexed on a 64-bit computer. (This is one reason for the
 existence of the \cw{-D} and \cw{-L} options: you can do the
 scanning on the machine with access to the filesystem, and the

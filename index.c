@@ -52,7 +52,7 @@ static int index_maxdepth(int nodecount)
 off_t index_initial_size(off_t currentsize, int nodecount)
 {
     currentsize += PADDING(currentsize, alignof(off_t));
-    currentsize += nodecount + sizeof(off_t);
+    currentsize += nodecount * sizeof(off_t);
     currentsize += PADDING(currentsize, alignof(struct avlnode));
 
     return currentsize;

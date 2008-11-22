@@ -269,7 +269,9 @@ void indexbuild_rebase(indexbuild *ib, void *t)
     ib->t = t;
     ib->nodes = (struct avlnode *)((unsigned char *)ib->nodes + diff);
     ib->roots = (off_t *)((unsigned char *)ib->roots + diff);
-    ib->currroot = (struct avlnode *)((unsigned char *)ib->currroot + diff);
+    if (ib->currroot)
+	ib->currroot = (struct avlnode *)
+	    ((unsigned char *)ib->currroot + diff);
     ib->firstmutable = (struct avlnode *)((unsigned char *)ib->firstmutable + diff);
 }
 

@@ -97,10 +97,12 @@
 
 extern char pathsep;
 
-#ifdef HAVE_LSTAT64
+#if defined HAVE_LSTAT64 && HAVE_STAT64
 #define STRUCT_STAT struct stat64
 #define LSTAT lstat64
+#define STAT stat64
 #else
 #define STRUCT_STAT struct stat
 #define LSTAT lstat
+#define STAT stat
 #endif

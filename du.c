@@ -170,15 +170,25 @@ static int str_cmp(const void *av, const void *bv)
 }
 
 static void du_recurse(char **path, size_t pathlen, size_t *pathsize,
-		       gotdata_fn_t gotdata, err_fn_t err, void *gotdata_ctx)
+		       gotdata_fn_t gotdata, err_fn_t err, void *gotdata_ctx,
+		       int toplevel)
 {
     const char *name;
     dirhandle d;
     STRUCT_STAT st;
     char **names;
     size_t i, nnames, namesize;
+    int statret;
 
-    if (LSTAT(*path, &st) < 0) {
+    /*
+     * Special case: at the very top of the scan, we follow a
+     * symlink.
+     */
+    if (toplevel)
+	statret = STAT(*path, &st);
+    else
+	statret = LSTAT(*path, &st);
+    if (statret < 0) {
 	err(gotdata_ctx, "%s: lstat: %s\n", *path, strerror(errno));
 	return;
     }
@@ -231,7 +241,7 @@ static void du_recurse(char **path, size_t pathlen, size_t *pathsize,
 	    sprintf(*path + pathlen, "/%s", names[i]);
 	}
 
-	du_recurse(path, newpathlen, pathsize, gotdata, err, gotdata_ctx);
+	du_recurse(path, newpathlen, pathsize, gotdata, err, gotdata_ctx, 0);
 
 	sfree(names[i]);
     }
@@ -249,5 +259,5 @@ void du(const char *inpath, gotdata_fn_t gotdata, err_fn_t err,
     path = snewn(pathsize, char);
     strcpy(path, inpath);
 
-    du_recurse(&path, pathlen, &pathsize, gotdata, err, gotdata_ctx);
+    du_recurse(&path, pathlen, &pathsize, gotdata, err, gotdata_ctx, 1);
 }

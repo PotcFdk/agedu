@@ -218,7 +218,8 @@ static off_t triebuild_unwind(triebuild *tb, int targetdepth, int *outcount)
     while (depth > targetdepth) {
 	int odepth = depth;
 	while (depth > targetdepth &&
-	       (depth-1 > tb->switchsize || tb->switches[depth-1].len == 0))
+	       (depth-1 > tb->switchsize || !tb->switches ||
+		tb->switches[depth-1].len == 0))
 	    depth--;
 	if (odepth > depth) {
 	    /*

@@ -9,9 +9,6 @@
 
 #define alignof(typ) ( offsetof(struct { char c; typ t; }, t) )
 
-#define min(x,y) ((x)<(y) ? (x):(y))
-#define max(x,y) ((x)>(y) ? (x):(y))
-
 #define PADDING(x, mod) ( ((mod) - ((x) % (mod))) % (mod) )
 
 struct avlnode {

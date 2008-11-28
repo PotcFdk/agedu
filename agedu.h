@@ -106,3 +106,6 @@ extern char pathsep;
 #define LSTAT lstat
 #define STAT stat
 #endif
+
+#define max(x,y) ( (x) > (y) ? (x) : (y) )
+#define min(x,y) ( (x) < (y) ? (x) : (y) )

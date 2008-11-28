@@ -90,7 +90,7 @@ static int gotdata(void *vctx, const char *pathname, const STRUCT_STAT *st)
     if (ctx->usemtime || (ctx->fakeatimes && S_ISDIR(st->st_mode)))
 	file.atime = st->st_mtime;
     else
-	file.atime = st->st_atime;
+	file.atime = max(st->st_mtime, st->st_atime);
 
     /*
      * Filter based on wildcards.

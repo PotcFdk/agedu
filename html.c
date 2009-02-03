@@ -237,6 +237,7 @@ static void end_colour_bar(struct html *ctx)
 struct vector {
     int want_href;
     char *name;
+    int literal; /* should the name be formatted in fixed-pitch? */
     unsigned long index;
     unsigned long long sizes[MAXCOLOUR+1];
 };
@@ -264,7 +265,7 @@ int vec_compare(const void *av, const void *bv)
 }
 
 static struct vector *make_vector(struct html *ctx, char *path,
-				  int want_href, char *name)
+				  int want_href, char *name, int literal)
 {
     unsigned long xi1, xi2;
     struct vector *vec = snew(struct vector);
@@ -272,6 +273,7 @@ static struct vector *make_vector(struct html *ctx, char *path,
 
     vec->want_href = want_href;
     vec->name = name ? dupstr(name) : NULL;
+    vec->literal = literal;
 
     get_indices(ctx->t, path, &xi1, &xi2);
 
@@ -360,7 +362,11 @@ static void write_report_line(struct html *ctx, struct vector *vec)
 	    htprintf(ctx, "<a href=\"%s\">", ctx->href);
 	    doing_href = 1;
 	}
+	if (vec->literal)
+	    htprintf(ctx, "<code>");
 	htescape(ctx, vec->name, strlen(vec->name), 1);
+	if (vec->literal)
+	    htprintf(ctx, "</code>");
 	if (doing_href)
 	    htprintf(ctx, "</a>");
     }
@@ -536,7 +542,7 @@ char *html_query(const void *t, unsigned long index,
     vecsize = 64;
     vecs = snewn(vecsize, struct vector *);
     nvecs = 1;
-    vecs[0] = make_vector(ctx, path, 0, NULL);
+    vecs[0] = make_vector(ctx, path, 0, NULL, 0);
     print_heading(ctx, "Overall");
     write_report_line(ctx, vecs[0]);
 
@@ -564,7 +570,7 @@ char *html_query(const void *t, unsigned long index,
 	    vecs = sresize(vecs, vecsize, struct vector *);
 	}
 	assert(strlen(path2) > pathlen);
-	vecs[nvecs] = make_vector(ctx, path2, 1, path2 + subdirpos);
+	vecs[nvecs] = make_vector(ctx, path2, 1, path2 + subdirpos, 1);
 	for (i = 0; i <= MAXCOLOUR; i++)
 	    vecs[0]->sizes[i] -= vecs[nvecs]->sizes[i];
 	nvecs++;

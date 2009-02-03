@@ -1,8 +1,6 @@
-# Makefile for umlwrap.
+# Makefile for agedu.
 
 prefix = /usr/local
-libdir = $(prefix)/lib
-ourlibdir = $(prefix)/lib/umlwrap
 bindir = $(prefix)/bin
 mandir = $(prefix)/man
 man1dir = $(mandir)/man1

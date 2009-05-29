@@ -283,6 +283,19 @@ void indexbuild_free(indexbuild *ib)
     sfree(ib);
 }
 
+int index_has_root(const void *t, int n)
+{
+    const off_t *roots;
+
+    roots = (const off_t *)((const char *)t + trie_get_index_offset(t));
+
+    if (n == 0)
+	return 1;
+    if (n < 0 || n >= trie_count(t) || !roots[n-1])
+	return 0;
+    return 1;
+}
+
 unsigned long long index_query(const void *t, int n, unsigned long long at)
 {
     const off_t *roots;

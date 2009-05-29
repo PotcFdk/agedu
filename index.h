@@ -51,6 +51,12 @@ off_t indexbuild_realsize(indexbuild *ib);
 void indexbuild_free(indexbuild *ib);
 
 /*
+ * Check to see if a name index has an index tree root available
+ * (i.e. represents a directory rather than a file).
+ */
+int index_has_root(const void *t, int n);
+
+/*
  * Query an index to find the total size of records with name
  * index strictly less than n, with atime less than at.
  */

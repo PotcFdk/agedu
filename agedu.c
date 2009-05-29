@@ -1228,7 +1228,8 @@ int main(int argc, char **argv)
 	    munmap(mappedfile, totalsize);
 	} else if (mode == HTML) {
 	    char *querydir = actions[action].arg;
-	    size_t pathlen;
+	    size_t pathlen, maxpathlen;
+	    char *pathbuf;
 	    struct html_config cfg;
 	    unsigned long xi;
 	    char *html;
@@ -1251,6 +1252,9 @@ int main(int argc, char **argv)
 	    }
 	    pathsep = trie_pathsep(mappedfile);
 
+	    maxpathlen = trie_maxpathlen(mappedfile);
+	    pathbuf = snewn(maxpathlen, char);
+
 	    /*
 	     * Trim trailing slash, just in case.
 	     */
@@ -1259,14 +1263,29 @@ int main(int argc, char **argv)
 		querydir[--pathlen] = '\0';
 
 	    xi = trie_before(mappedfile, querydir);
-	    cfg.format = NULL;
-	    cfg.autoage = htmlautoagerange;
-	    cfg.oldest = htmloldest;
-	    cfg.newest = htmlnewest;
-	    html = html_query(mappedfile, xi, &cfg);
-	    fputs(html, stdout);
+	    if (xi >= trie_count(mappedfile) ||
+		(trie_getpath(mappedfile, xi, pathbuf),
+		 strcmp(pathbuf, querydir))) {
+		fprintf(stderr, "%s: pathname '%s' does not exist in index\n"
+			"%*s(check it is spelled exactly as it is in the "
+			"index, including\n%*sany leading './')\n",
+			PNAME, querydir,
+			(int)(1+sizeof(PNAME)), "",
+			(int)(1+sizeof(PNAME)), "");
+	    } else if (!index_has_root(mappedfile, xi)) {
+		fprintf(stderr, "%s: pathname '%s' is"
+			" a file, not a directory\n", PNAME, querydir);
+	    } else {
+		cfg.format = NULL;
+		cfg.autoage = htmlautoagerange;
+		cfg.oldest = htmloldest;
+		cfg.newest = htmlnewest;
+		html = html_query(mappedfile, xi, &cfg);
+		fputs(html, stdout);
+	    }
 
 	    munmap(mappedfile, totalsize);
+	    sfree(pathbuf);
 	} else if (mode == DUMP) {
 	    size_t maxpathlen;
 	    char *buf;

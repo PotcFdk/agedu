@@ -65,7 +65,7 @@ mode:
 which will print (among other messages) a URL on its standard output
 along the lines of
 
-\c URL: http://127.164.152.163:48638/
+\c URL: http://127.0.0.1:48638/
 
 (That URL will always begin with \cq{127.}, meaning that it's in the
 \cw{localhost} address space. So only processes running on the same

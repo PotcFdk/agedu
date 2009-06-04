@@ -414,7 +414,6 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
     int fd, ret;
     int authtype;
     char *authstring = NULL;
-    unsigned long ipaddr;
     struct fd *f;
     struct sockaddr_in addr;
     socklen_t addrlen;
@@ -433,20 +432,25 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
     }
     addr.sin_family = AF_INET;
     if (!dcfg->address) {
+#ifdef RANDOM_LOCALHOST
+	unsigned long ipaddr;
 	srand(0L);
 	ipaddr = 0x7f000000;
 	ipaddr += (1 + rand() % 255) << 16;
 	ipaddr += (1 + rand() % 255) << 8;
 	ipaddr += (1 + rand() % 255);
 	addr.sin_addr.s_addr = htonl(ipaddr);
+#else
+	addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+#endif
 	addr.sin_port = htons(0);
-	
     } else {
 	addr.sin_addr.s_addr = inet_addr(dcfg->address);
 	addr.sin_port = dcfg->port ? htons(dcfg->port) : 0;
     }
     addrlen = sizeof(addr);
     ret = bind(fd, (const struct sockaddr *)&addr, addrlen);
+#ifdef RANDOM_LOCALHOST
     if (ret < 0 && errno == EADDRNOTAVAIL && !dcfg->address) {
 	/*
 	 * Some systems don't like us binding to random weird
@@ -457,6 +461,7 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
 	addr.sin_port = htons(0);
 	ret = bind(fd, (const struct sockaddr *)&addr, addrlen);
     }
+#endif
     if (ret < 0) {
 	fprintf(stderr, "bind: %s\n", strerror(errno));
 	exit(1);

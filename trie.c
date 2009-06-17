@@ -15,9 +15,9 @@
  */
 static int trieccmp(unsigned char a, unsigned char b)
 {
-    a = (a == '\0' ? '\0' : a == pathsep ? '\1' : a+1);
-    b = (b == '\0' ? '\0' : b == pathsep ? '\1' : b+1);
-    return (int)a - (int)b;
+    int ia = (a == '\0' ? '\0' : a == pathsep ? '\1' : a+1);
+    int ib = (b == '\0' ? '\0' : b == pathsep ? '\1' : b+1);
+    return ia - ib;
 }
 
 static int triencmp(const char *a, size_t alen,

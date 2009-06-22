@@ -458,7 +458,7 @@ to go through by hand looking for data you don't need), but may be
 better than nothing if your last-access times are unhelpful.
 
 The following options affect the web server mode \cw{-w}, and in one
-case also the stand-along HTML generation mode \cw{-H}:
+case also the stand-alone HTML generation mode \cw{-H}:
 
 \dt \cw{-r} \e{age range} or \cw{--age-range} \e{age range}
 

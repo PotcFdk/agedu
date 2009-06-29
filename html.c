@@ -176,7 +176,21 @@ static unsigned long long fetch_size(const void *t,
 				     unsigned long xi1, unsigned long xi2,
 				     unsigned long long atime)
 {
-    return index_query(t, xi2, atime) - index_query(t, xi1, atime);
+    if (xi2 - xi1 == 1) {
+	/*
+	 * We are querying an individual file, so we should not
+	 * depend on the index entries either side of the node,
+	 * since they almost certainly don't both exist. Instead,
+	 * just look up the file's size and atime in the main trie.
+	 */
+	const struct trie_file *f = trie_getfile(t, xi1);
+	if (f->atime < atime)
+	    return f->size;
+	else
+	    return 0;
+    } else {
+	return index_query(t, xi2, atime) - index_query(t, xi1, atime);
+    }
 }
 
 static void htescape(struct html *ctx, const char *s, int n, int italics)
@@ -235,7 +249,7 @@ static void end_colour_bar(struct html *ctx)
 }
 
 struct vector {
-    int want_href;
+    int want_href, essential;
     char *name;
     int literal; /* should the name be formatted in fixed-pitch? */
     unsigned long index;
@@ -261,17 +275,23 @@ int vec_compare(const void *av, const void *bv)
 	return -1;
     else if (a->index > b->index)
 	return +1;
+    else if (a->essential < b->essential)
+	return +1;
+    else if (a->essential > b->essential)
+	return -1;
     return 0;
 }
 
 static struct vector *make_vector(struct html *ctx, char *path,
-				  int want_href, char *name, int literal)
+				  int want_href, int essential,
+				  char *name, int literal)
 {
     unsigned long xi1, xi2;
     struct vector *vec = snew(struct vector);
     int i;
 
     vec->want_href = want_href;
+    vec->essential = essential;
     vec->name = name ? dupstr(name) : NULL;
     vec->literal = literal;
 
@@ -313,7 +333,7 @@ static void write_report_line(struct html *ctx, struct vector *vec)
      * case we must fiddle about to prevent divisions by zero in
      * the code below.
      */
-    if (!vec->sizes[MAXCOLOUR] && vec->want_href)
+    if (!vec->sizes[MAXCOLOUR] && !vec->essential)
 	return;
     divisor = ctx->totalsize;
     if (!divisor) {
@@ -542,7 +562,7 @@ char *html_query(const void *t, unsigned long index,
     vecsize = 64;
     vecs = snewn(vecsize, struct vector *);
     nvecs = 1;
-    vecs[0] = make_vector(ctx, path, 0, NULL, 0);
+    vecs[0] = make_vector(ctx, path, 0, 1, NULL, 0);
     print_heading(ctx, "Overall");
     write_report_line(ctx, vecs[0]);
 
@@ -563,14 +583,15 @@ char *html_query(const void *t, unsigned long index,
 	trie_getpath(t, xi1, path2);
 	get_indices(t, ctx->path2, &xj1, &xj2);
 	xi1 = xj2;
-	if (xj2 - xj1 <= 1)
+	if (!cfg->showfiles && xj2 - xj1 <= 1)
 	    continue;		       /* skip individual files */
 	if (nvecs >= vecsize) {
 	    vecsize = nvecs * 3 / 2 + 64;
 	    vecs = sresize(vecs, vecsize, struct vector *);
 	}
 	assert(strlen(path2) > pathlen);
-	vecs[nvecs] = make_vector(ctx, path2, 1, path2 + subdirpos, 1);
+	vecs[nvecs] = make_vector(ctx, path2, (xj2 - xj1 > 1), 0,
+				  path2 + subdirpos, 1);
 	for (i = 0; i <= MAXCOLOUR; i++)
 	    vecs[0]->sizes[i] -= vecs[nvecs]->sizes[i];
 	nvecs++;

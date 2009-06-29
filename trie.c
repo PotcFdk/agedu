@@ -593,7 +593,36 @@ void trie_getpath(const void *t, unsigned long n, char *buf)
 	    assert(i < sw->len);
 	}
     }
-}    
+}
+
+const struct trie_file *trie_getfile(const void *t, unsigned long n)
+{
+    const struct trie_header *hdr = NODE(t, 0, trie_header);
+    off_t off = hdr->root;
+
+    while (1) {
+	const struct trie_common *node = NODE(t, off, trie_common);
+	if (node->type == TRIE_LEAF) {
+	    const struct trie_leaf *leaf = NODE(t, off, trie_leaf);
+	    return &leaf->file;
+	} else if (node->type == TRIE_STRING) {
+	    const struct trie_string *st = NODE(t, off, trie_string);
+	    off = st->subnode;
+	} else if (node->type == TRIE_SWITCH) {
+	    const struct trie_switch *sw = NODE(t, off, trie_switch);
+	    int i;
+
+	    for (i = 0; i < sw->len; i++) {
+		if (n < sw->sw[i].subcount) {
+		    off = sw->sw[i].subnode;
+		    break;
+		} else
+		    n -= sw->sw[i].subcount;
+	    }
+	    assert(i < sw->len);
+	}
+    }
+}
 
 unsigned long trie_count(const void *t)
 {

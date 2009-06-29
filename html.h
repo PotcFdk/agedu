@@ -21,6 +21,12 @@ struct html_config {
      */
     int autoage;
     time_t oldest, newest;
+
+    /*
+     * Specify whether to show individual files as well as
+     * directories in the report.
+     */
+    int showfiles;
 };
 
 /*

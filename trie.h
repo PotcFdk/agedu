@@ -91,6 +91,11 @@ unsigned long trie_before(const void *t, const char *pathname);
 void trie_getpath(const void *t, unsigned long n, char *buf);
 
 /*
+ * Return the trie_file * for the nth entry in the trie.
+ */
+const struct trie_file *trie_getfile(const void *t, unsigned long n);
+
+/*
  * Return the total number of entries in the whole trie.
  */
 unsigned long trie_count(const void *t);

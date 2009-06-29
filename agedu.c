@@ -159,12 +159,12 @@ static void scan_error(void *vctx, const char *fmt, ...)
 }
 
 static void text_query(const void *mappedfile, const char *querydir,
-		       time_t t, int depth)
+		       time_t t, int showfiles, int depth)
 {
     size_t maxpathlen;
     char *pathbuf;
     unsigned long xi1, xi2;
-    unsigned long long s1, s2;
+    unsigned long long size;
 
     maxpathlen = trie_maxpathlen(mappedfile);
     pathbuf = snewn(maxpathlen + 1, char);
@@ -179,16 +179,32 @@ static void text_query(const void *mappedfile, const char *querydir,
     xi1 = trie_before(mappedfile, querydir);
     xi2 = trie_before(mappedfile, pathbuf);
 
-    if (xi2 - xi1 == 1)
+    if (!showfiles && xi2 - xi1 == 1)
 	return;			       /* file, or empty dir => no display */
 
     /*
      * Now do the lookups in the age index.
      */
-    s1 = index_query(mappedfile, xi1, t);
-    s2 = index_query(mappedfile, xi2, t);
+    if (xi2 - xi1 == 1) {
+	/*
+	 * We are querying an individual file, so we should not
+	 * depend on the index entries either side of the node,
+	 * since they almost certainly don't both exist. Instead,
+	 * just look up the file's size and atime in the main trie.
+	 */
+	const struct trie_file *f = trie_getfile(mappedfile, xi1);
+	if (f->atime < t)
+	    size = f->size;
+	else
+	    size = 0;
+    } else {
+	unsigned long long s1, s2;
+	s1 = index_query(mappedfile, xi1, t);
+	s2 = index_query(mappedfile, xi2, t);
+	size = s2 - s1;
+    }
 
-    if (s1 == s2)
+    if (size == 0)
 	return;			       /* no space taken up => no display */
 
     if (depth > 0) {
@@ -199,14 +215,14 @@ static void text_query(const void *mappedfile, const char *querydir,
 	xi1++;
 	while (xi1 < xi2) {
 	    trie_getpath(mappedfile, xi1, pathbuf);
-	    text_query(mappedfile, pathbuf, t, depth-1);
+	    text_query(mappedfile, pathbuf, t, showfiles, depth-1);
 	    make_successor(pathbuf);
 	    xi1 = trie_before(mappedfile, pathbuf);
 	}
     }
 
     /* Display in units of 1Kb */
-    printf("%-11llu %s\n", (s2 - s1) / 1024, querydir);
+    printf("%-11llu %s\n", (size) / 1024, querydir);
 }
 
 /*
@@ -320,6 +336,8 @@ static void text_query(const void *mappedfile, const char *querydir,
         HELPOPT("[--scan,--load] fake atimes on directories") \
     NOVAL(MTIME) LONG(mtime) \
         HELPOPT("[--scan] use mtime instead of atime") \
+    NOVAL(SHOWFILES) LONG(files) \
+        HELPOPT("[--web,--html,--text] list individual files") \
     VAL(AGERANGE) SHORT(r) LONG(age_range) LONG(range) LONG(ages) \
         HELPARG("age[-age]") HELPOPT("[--web,--html] set limits of colour coding") \
     VAL(SERVERADDR) LONG(address) LONG(addr) LONG(server_address) \
@@ -482,6 +500,7 @@ int main(int argc, char **argv)
     int tqdepth = 1;
     int fakediratimes = 1;
     int mtime = 0;
+    int showfiles = 0;
 
 #ifdef DEBUG_MAD_OPTION_PARSING_MACROS
     {
@@ -731,6 +750,9 @@ int main(int argc, char **argv)
 		    break;
 		  case OPT_NODIRATIME:
 		    fakediratimes = 1;
+		    break;
+		  case OPT_SHOWFILES:
+		    showfiles = 1;
 		    break;
 		  case OPT_MTIME:
 		    mtime = 1;
@@ -1223,7 +1245,7 @@ int main(int argc, char **argv)
 	    if (pathlen > 0 && querydir[pathlen-1] == pathsep)
 		querydir[--pathlen] = '\0';
 
-	    text_query(mappedfile, querydir, textcutoff, tqdepth);
+	    text_query(mappedfile, querydir, textcutoff, showfiles, tqdepth);
 
 	    munmap(mappedfile, totalsize);
 	} else if (mode == HTML) {
@@ -1280,6 +1302,7 @@ int main(int argc, char **argv)
 		cfg.autoage = htmlautoagerange;
 		cfg.oldest = htmloldest;
 		cfg.newest = htmlnewest;
+		cfg.showfiles = showfiles;
 		html = html_query(mappedfile, xi, &cfg);
 		fputs(html, stdout);
 	    }
@@ -1347,6 +1370,7 @@ int main(int argc, char **argv)
 	    pcfg.autoage = htmlautoagerange;
 	    pcfg.oldest = htmloldest;
 	    pcfg.newest = htmlnewest;
+	    pcfg.showfiles = showfiles;
 	    run_httpd(mappedfile, auth, &dcfg, &pcfg);
 	    munmap(mappedfile, totalsize);
 	} else if (mode == REMOVE) {

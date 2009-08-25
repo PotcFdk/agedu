@@ -30,4 +30,4 @@ delegate windows
   return agedu/winscan.exe
 enddelegate
 
-deliver agedu/winscan.exe $@
+deliver agedu/winscan.exe ageduscan.exe

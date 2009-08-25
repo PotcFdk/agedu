@@ -23,3 +23,11 @@ in agedu do halibut --html=manpage.html agedu.but
 
 deliver agedu-r$(revision).tar.gz $@
 deliver agedu/manpage.html $@
+
+delegate windows
+  # FIXME: Cygwin alternative?
+  in agedu do cmd /c vcvars32 \& cl winscan.c
+  return agedu/winscan.exe
+enddelegate
+
+deliver agedu/winscan.exe $@

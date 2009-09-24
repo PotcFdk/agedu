@@ -430,6 +430,7 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
 	fprintf(stderr, "socket(PF_INET): %s\n", strerror(errno));
 	exit(1);
     }
+    memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     if (!dcfg->address) {
 #ifdef RANDOM_LOCALHOST

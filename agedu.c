@@ -1038,9 +1038,10 @@ int main(int argc, char **argv)
 				}
 				p++;
 			    }
+			} else {
+			    p++;
 			}
 			*q++ = c;
-			p++;
 		    }
 		    *q = '\0';
 		    triebuild_add(ctx->tb, buf, &tf);

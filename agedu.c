@@ -56,14 +56,18 @@ struct ctx {
 static void dump_line(const char *pathname, const struct trie_file *tf)
 {
     const char *p;
-    printf("%llu %llu ", tf->size, tf->atime);
+    if (printf("%llu %llu ", tf->size, tf->atime) < 0) goto error;
     for (p = pathname; *p; p++) {
-	if (*p >= ' ' && *p < 127 && *p != '%')
-	    putchar(*p);
-	else
-	    printf("%%%02x", (unsigned char)*p);
+	if (*p >= ' ' && *p < 127 && *p != '%') {
+	    if (putchar(*p) == EOF) goto error;
+	} else {
+	    if (printf("%%%02x", (unsigned char)*p) < 0) goto error;
+	}
     }
-    putchar('\n');
+    if (putchar('\n') == EOF) goto error;
+    return;
+    error:
+    fatal("standard output: %s", strerror(errno));
 }
 
 static int gotdata(void *vctx, const char *pathname, const STRUCT_STAT *st)

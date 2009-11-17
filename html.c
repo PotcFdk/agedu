@@ -24,7 +24,7 @@ struct html {
     time_t now;
 };
 
-static void vhtprintf(struct html *ctx, char *fmt, va_list ap)
+static void vhtprintf(struct html *ctx, const char *fmt, va_list ap)
 {
     va_list ap2;
     int size, size2;
@@ -50,7 +50,7 @@ static void vhtprintf(struct html *ctx, char *fmt, va_list ap)
     ctx->buflen += size;
 }
 
-static void htprintf(struct html *ctx, char *fmt, ...)
+static void htprintf(struct html *ctx, const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
@@ -317,12 +317,31 @@ static void print_heading(struct html *ctx, const char *title)
 	     "<td colspan=4 align=center>%s</td>\n</tr>\n", title);
 }
 
+static void compute_display_size(unsigned long long size,
+				 const char **fmt, double *display_size)
+{
+    static const char *const fmts[] = {
+	"%g b", "%g Kb", "%#.1f Mb", "%#.1f Gb", "%#.1f Tb",
+	"%#.1f Pb", "%#.1f Eb", "%#.1f Zb", "%#.1f Yb"
+    };
+    int shift = 0;
+
+    while (size >= 1024 && shift < lenof(fmts)-1) {
+	size >>= 10;
+	shift++;
+    }
+    *display_size = (double)size;
+    *fmt = fmts[shift];
+}
+
 #define PIXEL_SIZE 600		       /* FIXME: configurability? */
 static void write_report_line(struct html *ctx, struct vector *vec)
 {
     unsigned long long size, asize, divisor;
+    double display_size;
     int pix, newpix;
     int i;
+    const char *unitsfmt;
 
     /*
      * A line with literally zero space usage should not be
@@ -344,9 +363,11 @@ static void write_report_line(struct html *ctx, struct vector *vec)
      * Find the total size of this subdirectory.
      */
     size = vec->sizes[MAXCOLOUR];
+    compute_display_size(size, &unitsfmt, &display_size);
     htprintf(ctx, "<tr>\n"
-	     "<td style=\"padding: 0.2em; text-align: right\">%lluMb</td>\n",
-	     ((size + ((1<<20)-1)) >> 20)); /* convert to Mb, rounding up */
+              "<td style=\"padding: 0.2em; text-align: right\">");
+    htprintf(ctx, unitsfmt, display_size);
+    htprintf(ctx, "</td>\n");
 
     /*
      * Generate a colour bar.

@@ -1,0 +1,260 @@
+\cfg{html-chapter-numeric}{true}
+\cfg{html-chapter-suffix}{. }
+\cfg{chapter}{Section}
+
+\define{dash} \u2013{-}
+
+\title A tree structure for log-time quadrant counting
+
+This article describes a general form of data structure which
+permits the storing of two-dimensional data in such a way that a
+log-time lookup can reliably return the total \e{amount} of data in
+an arbitrary quadrant (i.e. a region both upward and leftward of a
+user-specified point).
+
+The program
+\W{http://www.chiark.greenend.org.uk/~sgtatham/agedu}\cw{agedu},
+which uses a data structure of this type for its on-disk index
+files, is used as a case study.
+
+\C{problem} The problem
+
+The basic problem can be stated as follows: you have a collection of
+\cw{N} points, each specified as an \cw{(x,y)} coordinate pair, and
+you want to be able to efficiently answer questions of the general
+form \q{How many points have both \cw{x\_<\_x0} and \cw{y\_<\_y0}?},
+for arbitrary \cw{(x0,y0)}.
+
+A slightly enhanced form of the problem, which is no more difficult
+to solve, allows each point to have a \e{weight} as well as
+coordinates; now the question to be answered is \q{What is the
+\e{total weight} of the points with both \cw{x\_<\_x0} and \cw{y\_<\_y0}?}. The
+previous version of the question, of course, is a special case of
+this in which all weights are set to 1.
+
+The data structure presented in this article answers any question of
+this type in time \cw{O(log N)}.
+
+\C{onedim} The one-dimensional case
+
+To begin with, we address the one-dimensional analogue of the
+problem. If we have a set of points which each have an
+\cw{x}-coordinate and a weight, how do we represent them so as to be
+able to find the total weight of all points with \cw{x\_<\_x0}?
+
+An obvious solution is to sort the points into order of their
+\cw{x}-coordinate, and alongside each point to list the total weight of
+everything up to and including that point. Then, given any \cw{x0}, a
+log-time binary search will find the last point in the list with
+\cw{x\_<\_x0}, and we can immediately read off the cumulative weight
+figure.
+
+Now let's be more ambitious. What if the set of points were
+constantly changing \dash new points arriving, old points going away
+\dash and we wanted a data structure which would cope efficiently
+with dynamic updates while maintaining the ability to answer these
+count queries?
+
+An efficient solution begins by storing the points in a balanced
+tree, sorted by their \cw{x}-coordinates. Any of the usual types \dash
+AVL tree, red-black tree, the various forms of B-tree \dash will
+suffice. We then annotate every node of the tree with an extra field
+giving the total weight of the points in and below that node.
+
+These annotations can be maintained through updates to the tree,
+without sacrificing the \cw{O(log N)} time bound on insertions or
+deletions. So we can start with an empty tree and insert a complete
+set of points, or we can insert and delete points in arbitrary
+order, and the tree annotations will remain valid at all times.
+
+A balanced tree sorted by \cw{x} can easily be searched to find the
+last point with \cw{x\_<\_x0}, for any \cw{x0}. If the tree has total-weight
+annotations as described above, we can arrange that this search
+calculates the total weight of all points with \cw{x\_<\_x0}: every time
+we examine a tree node and decide which subtree of it to descend to,
+we look at the top node of each subtree to the left of that one, and
+add their weight annotations to a running total. When we reach a
+leaf node and find our chosen subtree is \cw{NULL}, the running
+total is the required answer.
+
+So this data structure allows us to maintain a changing set of
+points in such a way that we can do an efficient one-dimensional
+count query at any time.
+
+\C{incremental} An incremental approach
+
+Now we'll use the above one-dimensional structure to answer a
+restricted form of the original 2-D problem. Suppose we have some
+large set of \cw{(x0,y0)} pairs for which we want to answer
+counted-quadrant queries, and suppose (for the moment) that we have
+\e{all of the queries presented in advance}. Is there any way we can
+do that efficiently?
+
+There is. We sort our points by their \cw{y}-coordinate, and then go
+through them in that order adding them one by one to a balanced tree
+sorted by \cw{x} as described above.
+
+So for any query coordinates \cw{(x0,y0)}, there must be some moment
+during that process at which we have added to our tree precisely
+those points with \cw{y\_<\_y0}. At that moment, we could search the tree
+to find the total weight of everything it contained with \cw{x\_<\_x0},
+and that would be the answer to our two-dimensional query.
+
+Hence, if we also sorted our queries into order by \cw{y0}, we could
+progress through the list of queries in parallel with the list of
+points (much like merging two sorted lists), answering each query at
+the moment when the tree contained just the right set of points to
+make it easy.
+
+\C{cow} Copy-on-write
+
+In real life, of course, we typically don't receive all our queries
+in a big batch up front. We want to construct a data structure
+capable of answering \e{any} query efficiently, and then be able to
+deal with queries as they arise.
+
+A data structure capable of this, it turns out, is only a small step
+away from the one described in the previous section. The small step
+is \e{copy-on-write}.
+
+As described in the previous section, we go through our list of
+points in order of their \cw{y}-coordinate, and we add each one in turn
+to a balanced tree sorted by \cw{x} with total-weight annotations. The
+catch is that, this time, we never \e{modify} any node in the tree:
+whenever the process of inserting an element into a tree wants to
+modify a node, we instead make a \e{copy} of that node containing
+the modified data. The parent of that node must now be modified
+(even if it would previously not have needed modification) so that
+it points at the copied node instead of the original \dash so we do
+the same thing there, and copy that one too, and so on up to the
+root.
+
+So after we have done a single insertion by this method, we end up
+with a new tree root which describes the new tree \dash but the old
+tree root, describing the tree before the insertion, is still valid,
+because every node reachable from the old root is unchanged.
+
+Therefore, if we start with an empty tree and repeatedly do this, we
+will end up with a distinct tree root for each point in the process,
+and \e{all of them will be valid at once}. It's as if we had done
+the incremental tree construction in the previous section, but could
+rewind time to any point in the process.
+
+So now all we have to do is make a list of those tree roots, with
+their associated \cw{y}-coordinates. Any way of doing this will do
+\dash another balanced tree, or a simple sorted list to be
+binary-searched, or something more exotic, whatever is convenient.
+
+Then we can answer an arbitrary quadrant query using only a pair of
+log-time searches: given a query coordinate pair \cw{(x0,y0)}, we
+look through our list of tree roots to find the one describing
+precisely the set of points with \cw{y\_<\_y0}, and then do a
+one-dimensional count query into that tree for the total weight of
+points with \cw{x\_<\_x0}. Done!
+
+The nice thing about all of this is that \e{nearly all} the nodes in
+each tree are shared with the next one. Consider: since the
+operation of adding an element to a balanced tree takes \cw{O(log N)}
+time, it must modify at most \cw{O(log N)} nodes. Each of these
+node-copying insertion processes must copy all of those nodes, but
+need not copy any others \dash so it creates at most \cw{O(log N)} new
+nodes. Hence, the total storage used by the combined set of trees is
+\cw{O(N log N)}, much smaller than the \cw{O(N^2 log N)} you'd expect if
+the trees were all separate or even mostly separate.
+
+\C{limitations} Limitations
+
+The one-dimensional data structure described at the start of this
+article is dynamically updatable: if the set of points to be
+searched changes, the structure can be modified efficiently without
+losing its searching properties. The two-dimensional structure we
+ended up with is not: if a single point changes its coordinates or
+weight, or appears, or disappears, then the whole structure must be
+rebuilt.
+
+Since the technique I used to add an extra dimension is critically
+dependent on the dynamic updatability of the one-dimensional base
+structure, but the resulting structure is not dynamically updatable
+in turn, it follows that this technique cannot be applied twice: no
+analogous transformation will construct a \e{three}-dimensional
+struccture capable of counting the total weight of an octant
+\cw{\{x\_ <\_x0, y\_<\_y0, z\_<\_z0\}}. I know of no efficient way
+to do that.
+
+The structure as described above uses \cw{O(N log N)} storage. Many
+algorithms using \cw{O(N log N)} time are considered efficient (e.g.
+sorting), but space is generally more expensive than time, and \cw{O(N
+log N)} space is larger than you think!
+
+\C{application} An application: \cw{agedu}
+
+The application for which I developed this data structure is
+\W{http://www.chiark.greenend.org.uk/~sgtatham/agedu}\cw{agedu}, a
+program which scans a file system and indexes pathnames against
+last-access times (\q{atimes}, in Unix terminology) so as to be able
+to point out directories which take up a lot of disk space but whose
+contents have not been accessed in years (making them strong
+candidates for tidying up or archiving to save space).
+
+So the fundamental searching primitive we want for \cw{agedu} is
+\q{What is the total size of the files contained within some
+directory path \cw{Ptop} which have atime at most \cw{T0}?}
+
+We begin by sorting the files into order by their full pathname.
+This brings every subdirectory, at every level, together into a
+contiguous sequence of files. So now our query primitive becomes
+\q{What is the total size of files whose pathname falls between
+\cw{P0} and \cw{P1}, and whose atime is at most \cw{T0}?}
+
+Clearly, we can simplify this to the same type of quadrant query as
+discussed above, by splitting this into two subqueries: the total
+size of files with \cw{P0\_<=\_P\_<\_P1} and \cw{T\_<\_T0} is clearly the
+total size of files with \cw{P\_<\_P1, T\_<\_T0} minus the total size
+of files with \cw{P\_<\_P0, T\_<\_T0}. Each of those subqueries is of
+precisely the type we have just derived a data structure to answer.
+
+So we want to sort our files by two \q{coordinates}: one is atime,
+and the other is pathname (sorted in ASCII collation order). So
+which should be \cw{x} and which \cw{y}, in the above notation?
+
+Well, either way round would work in principle, but two criteria
+inform the decision. Firstly, \cw{agedu} typically wants to do many
+queries on the same pathname for different atimes, so as to build up
+a detailed profile of size against atime for a given subdirectory.
+So it makes sense to have the first-level lookup (on \cw{y}, to find a
+tree root) be done on pathname, and the secondary lookup (on \cw{x},
+within that tree) be done on atime; then we can cache the tree root
+found in the first lookup, and use it many times without wasting
+time repeating the pathname search.
+
+Another important point for \cw{agedu} is that not all tree roots
+are actually used: the only pathnames ever submitted to a quadrant
+search are those at the start or the end of a particular
+subdirectory. This allows us to save a lot of disk space by limiting
+the copy-on-write behaviour: instead of \e{never} modifying an
+existing tree node, we now rule that we may modify a tree node \e{if
+it has already been modified once since the last tree root we
+saved}. In real-world cases, this cuts down the total space usage by
+about a factor of five, so it's well worthwhile \dash and we
+wouldn't be able to do it if we'd used atime as the \cw{y}-coordinate
+instead of pathname.
+
+Since the \q{\cw{y}-coordinates} in \cw{agedu} are strings, the
+top-level lookup to find a tree root is most efficiently done using
+neither a balanced tree nor a sorted list, but a trie: tries allow
+lookup of a string in time proportional to the length of the string,
+whereas either of the other approaches would require \cw{O(log N)}
+compare operations \e{each} of which could take time proportional to
+the length of the string.
+
+Finally, the two-dimensions limitation on the above data structure
+unfortunately imposes limitations on what \cw{agedu} can do. One
+would like to run a single \cw{agedu} as a system-wide job on a file
+server (perhaps nightly or weekly), and present the results to all
+users in such a way that each user's view of the data was filtered
+to only what their access permissions permitted them to see. Sadly,
+to do this would require a third dimension in the data structure
+(representing ownership or access control, in some fashion), and
+hence cannot be done efficiently. \cw{agedu} is therefore instead
+most sensibly used on demand by an individual user, so that it
+generates a custom data set for that user every time.

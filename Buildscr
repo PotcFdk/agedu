@@ -20,9 +20,11 @@ in . do rm agedu-r$(revision)/GNUmakefile
 in . do tar chzvf agedu-r$(revision).tar.gz agedu-r$(revision)
 
 in agedu do halibut --html=manpage.html agedu.but
+in agedu do halibut --html=tree.html tree.but
 
 deliver agedu-r$(revision).tar.gz $@
 deliver agedu/manpage.html $@
+deliver agedu/tree.html $@
 
 delegate windows
   # FIXME: Cygwin alternative?

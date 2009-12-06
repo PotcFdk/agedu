@@ -596,6 +596,18 @@ willingness to do additional coding \dash to run a system-wide
 \cw{agedu} scan on a \cw{cron} job and serve the right subset of
 reports to each user.
 
+In certain circumstances, \cw{agedu} can report false positives
+(reporting files as disused which are in fact in use) as well as the
+more benign false negatives (reporting files as in use which are
+not). This arises when a file is, semantically speaking, \q{read}
+without actually being physically \e{read}. Typically this occurs
+when a program checks whether the file's mtime has changed and only
+bothers re-reading it if it has; programs which do this include
+\cw{rsync}(\e{1}) and \cw{make}(\e{1}). Such programs will fail to
+update the atime of unmodified files despite depending on their
+continued existence; a directory full of such files will be reported
+as disused by \cw{agedu} but deleting them will cause trouble.
+
 \U LICENCE
 
 \cw{agedu} is free software, distributed under the MIT licence. Type

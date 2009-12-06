@@ -13,7 +13,7 @@ an arbitrary quadrant (i.e. a region both upward and leftward of a
 user-specified point).
 
 The program
-\W{http://www.chiark.greenend.org.uk/~sgtatham/agedu}\cw{agedu},
+\W{http://www.chiark.greenend.org.uk/~sgtatham/agedu/}\cw{agedu},
 which uses a data structure of this type for its on-disk index
 files, is used as a case study.
 
@@ -189,7 +189,7 @@ log N)} space is larger than you think!
 \C{application} An application: \cw{agedu}
 
 The application for which I developed this data structure is
-\W{http://www.chiark.greenend.org.uk/~sgtatham/agedu}\cw{agedu}, a
+\W{http://www.chiark.greenend.org.uk/~sgtatham/agedu/}\cw{agedu}, a
 program which scans a file system and indexes pathnames against
 last-access times (\q{atimes}, in Unix terminology) so as to be able
 to point out directories which take up a lot of disk space but whose

@@ -177,8 +177,8 @@ dependent on the dynamic updatability of the one-dimensional base
 structure, but the resulting structure is not dynamically updatable
 in turn, it follows that this technique cannot be applied twice: no
 analogous transformation will construct a \e{three}-dimensional
-struccture capable of counting the total weight of an octant
-\cw{\{x\_ <\_x0, y\_<\_y0, z\_<\_z0\}}. I know of no efficient way
+structure capable of counting the total weight of an octant
+\cw{\{x\_<\_x0, y\_<\_y0, z\_<\_z0\}}. I know of no efficient way
 to do that.
 
 The structure as described above uses \cw{O(N log N)} storage. Many

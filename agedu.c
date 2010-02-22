@@ -1369,9 +1369,14 @@ int main(int argc, char **argv)
 		 */
 		int dirlen = outfile ? 2+strlen(outfile) : 3;
 		char prefix[dirlen];
-		if (outfile)
+		if (outfile) {
+		    if (mkdir(outfile, 0777) < 0 && errno != EEXIST) {
+			fprintf(stderr, "%s: %s: mkdir: %s\n", PNAME,
+				outfile, strerror(errno));
+			return 1;
+		    }
 		    snprintf(prefix, dirlen, "%s/", outfile);
-		else
+		} else
 		    snprintf(prefix, dirlen, "./");
 
 		unsigned long xi2;

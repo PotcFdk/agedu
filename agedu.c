@@ -163,7 +163,7 @@ static void scan_error(void *vctx, const char *fmt, ...)
 }
 
 static void text_query(const void *mappedfile, const char *querydir,
-		       time_t t, int showfiles, int depth)
+		       time_t t, int showfiles, int depth, FILE *fp)
 {
     size_t maxpathlen;
     char *pathbuf;
@@ -211,22 +211,23 @@ static void text_query(const void *mappedfile, const char *querydir,
     if (size == 0)
 	return;			       /* no space taken up => no display */
 
-    if (depth > 0) {
+    if (depth != 0) {
 	/*
 	 * Now scan for first-level subdirectories and report
 	 * those too.
 	 */
+	int newdepth = (depth > 0 ? depth - 1 : depth);
 	xi1++;
 	while (xi1 < xi2) {
 	    trie_getpath(mappedfile, xi1, pathbuf);
-	    text_query(mappedfile, pathbuf, t, showfiles, depth-1);
+	    text_query(mappedfile, pathbuf, t, showfiles, newdepth, fp);
 	    make_successor(pathbuf);
 	    xi1 = trie_before(mappedfile, pathbuf);
 	}
     }
 
     /* Display in units of 1Kb */
-    printf("%-11llu %s\n", (size) / 1024, querydir);
+    fprintf(fp, "%-11llu %s\n", (size) / 1024, querydir);
 }
 
 /*
@@ -344,6 +345,8 @@ static void text_query(const void *mappedfile, const char *querydir,
         HELPOPT("[--web,--html,--text] list individual files") \
     VAL(AGERANGE) SHORT(r) LONG(age_range) LONG(range) LONG(ages) \
         HELPARG("age[-age]") HELPOPT("[--web,--html] set limits of colour coding") \
+    VAL(OUTFILE) SHORT(o) LONG(output) \
+	HELPARG("filename") HELPOPT("[--html] specify output file or directory name") \
     VAL(SERVERADDR) LONG(address) LONG(addr) LONG(server_address) \
               LONG(server_addr) \
         HELPARG("addr[:port]") HELPOPT("[--web] specify HTTP server address") \
@@ -354,8 +357,8 @@ static void text_query(const void *mappedfile, const char *querydir,
         HELPARG("filename") HELPOPT("[--web] read HTTP Basic user/pass from file") \
     VAL(AUTHFD) LONG(auth_fd) \
         HELPARG("fd") HELPOPT("[--web] read HTTP Basic user/pass from fd") \
-    VAL(TQDEPTH) SHORT(d) LONG(depth) LONG(max_depth) LONG(maximum_depth) \
-        HELPARG("levels") HELPOPT("[--text] recurse to this many levels") \
+    VAL(DEPTH) SHORT(d) LONG(depth) LONG(max_depth) LONG(maximum_depth) \
+        HELPARG("levels") HELPOPT("[--text,--html] recurse to this many levels") \
     VAL(MINAGE) SHORT(a) LONG(age) LONG(min_age) LONG(minimum_age) \
         HELPARG("age") HELPOPT("[--text] include only files older than this") \
     HELPPFX("also") \
@@ -496,12 +499,13 @@ int main(int argc, char **argv)
     const char *httpserveraddr = NULL;
     int httpserverport = 0;
     const char *httpauthdata = NULL;
+    const char *outfile = NULL;
     int auth = HTTPD_AUTH_MAGIC | HTTPD_AUTH_BASIC;
     int progress = 1;
     struct inclusion_exclusion *inex = NULL;
     int ninex = 0, inexsize = 0;
     int crossfs = 0;
-    int tqdepth = 1;
+    int depth = -1, gotdepth = 0;
     int fakediratimes = 1;
     int mtime = 0;
     int showfiles = 0;
@@ -764,8 +768,20 @@ int main(int argc, char **argv)
 		  case OPT_DATAFILE:
 		    filename = optval;
 		    break;
-		  case OPT_TQDEPTH:
-		    tqdepth = atoi(optval);
+		  case OPT_DEPTH:
+		    if (!strcasecmp(optval, "unlimited") ||
+			!strcasecmp(optval, "infinity") ||
+			!strcasecmp(optval, "infinite") ||
+			!strcasecmp(optval, "inf") ||
+			!strcasecmp(optval, "maximum") ||
+			!strcasecmp(optval, "max"))
+			depth = -1;
+		    else
+			depth = atoi(optval);
+		    gotdepth = 1;
+		    break;
+		  case OPT_OUTFILE:
+		    outfile = optval;
 		    break;
 		  case OPT_MINAGE:
 		    textcutoff = parse_age(now, optval);
@@ -1250,7 +1266,22 @@ int main(int argc, char **argv)
 	    if (pathlen > 0 && querydir[pathlen-1] == pathsep)
 		querydir[--pathlen] = '\0';
 
-	    text_query(mappedfile, querydir, textcutoff, showfiles, tqdepth);
+	    if (!gotdepth)
+		depth = 1;	       /* default for text mode */
+	    if (outfile != NULL) {
+		FILE *fp = fopen(outfile, "w");
+		if (!fp) {
+		    fprintf(stderr, "%s: %s: open: %s\n", PNAME,
+			    outfile, strerror(errno));
+		    return 1;
+		}
+		text_query(mappedfile, querydir, textcutoff, showfiles,
+			   depth, fp);
+		fclose(fp);
+	    } else {
+		text_query(mappedfile, querydir, textcutoff, showfiles,
+			   depth, stdout);
+	    }
 
 	    munmap(mappedfile, totalsize);
 	} else if (mode == HTML) {
@@ -1302,14 +1333,59 @@ int main(int argc, char **argv)
 	    } else if (!index_has_root(mappedfile, xi)) {
 		fprintf(stderr, "%s: pathname '%s' is"
 			" a file, not a directory\n", PNAME, querydir);
-	    } else {
+	    } else if (!gotdepth) {
+		/*
+		 * Single output file.
+		 */
 		cfg.format = NULL;
+		cfg.rootpage = NULL;
 		cfg.autoage = htmlautoagerange;
 		cfg.oldest = htmloldest;
 		cfg.newest = htmlnewest;
 		cfg.showfiles = showfiles;
-		html = html_query(mappedfile, xi, &cfg);
-		fputs(html, stdout);
+		html = html_query(mappedfile, xi, &cfg, 0);
+		if (outfile != NULL) {
+		    FILE *fp = fopen(outfile, "w");
+		    if (!fp) {
+			fprintf(stderr, "%s: %s: open: %s\n", PNAME,
+				outfile, strerror(errno));
+			return 1;
+		    } else if (fputs(html, fp) < 0) {
+			fprintf(stderr, "%s: %s: write: %s\n", PNAME,
+				outfile, strerror(errno));
+			fclose(fp);
+			return 1;
+		    } else if (fclose(fp) < 0) {
+			fprintf(stderr, "%s: %s: fclose: %s\n", PNAME,
+				outfile, strerror(errno));
+			return 1;
+		    }
+		} else {
+		    fputs(html, stdout);
+		}
+	    } else {
+		/*
+		 * Multiple output files.
+		 */
+		int dirlen = outfile ? 2+strlen(outfile) : 3;
+		char prefix[dirlen];
+		if (outfile)
+		    snprintf(prefix, dirlen, "%s/", outfile);
+		else
+		    snprintf(prefix, dirlen, "./");
+
+		unsigned long xi2;
+		make_successor(pathbuf);
+		xi2 = trie_before(mappedfile, pathbuf);
+
+		cfg.format = "%lu.html";
+		cfg.rootpage = "index.html";
+		cfg.autoage = htmlautoagerange;
+		cfg.oldest = htmloldest;
+		cfg.newest = htmlnewest;
+		cfg.showfiles = showfiles;
+		if (html_dump(mappedfile, xi, xi2, depth, &cfg, prefix))
+		    return 1;
 	    }
 
 	    munmap(mappedfile, totalsize);
@@ -1372,6 +1448,7 @@ int main(int argc, char **argv)
 	    dcfg.port = httpserverport;
 	    dcfg.basicauthdata = httpauthdata;
 	    pcfg.format = NULL;
+	    pcfg.rootpage = NULL;
 	    pcfg.autoage = htmlautoagerange;
 	    pcfg.oldest = htmloldest;
 	    pcfg.newest = htmlnewest;

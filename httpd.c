@@ -277,7 +277,7 @@ char *got_data(struct connctx *ctx, char *data, int length,
 		ret = http_error("404", "Not Found", NULL,
 				 "This is not a valid pathname index.");
 	    } else {
-		document = html_query(ctx->t, index, cfg);
+		document = html_query(ctx->t, index, cfg, 1);
 		if (document) {
 		    ret = http_success("text/html", 1, document);
 		    sfree(document);

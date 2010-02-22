@@ -18,7 +18,7 @@ struct html {
     char *path2;
     char *href;
     size_t hreflen;
-    const char *format;
+    const char *format, *rootpage;
     unsigned long long thresholds[MAXCOLOUR];
     char *titletexts[MAXCOLOUR+1];
     time_t now;
@@ -334,6 +334,16 @@ static void compute_display_size(unsigned long long size,
     *fmt = fmts[shift];
 }
 
+static void make_filename(char *buf, size_t buflen,
+			  const char *format, const char *rootpage,
+			  unsigned long index)
+{
+    if (index == 0 && rootpage)
+	snprintf(buf, buflen, "%s", rootpage);
+    else
+	snprintf(buf, buflen, format, index);
+}
+
 #define PIXEL_SIZE 600		       /* FIXME: configurability? */
 static void write_report_line(struct html *ctx, struct vector *vec)
 {
@@ -399,7 +409,9 @@ static void write_report_line(struct html *ctx, struct vector *vec)
 	int doing_href = 0;
 
 	if (ctx->format && vec->want_href) {
-	    snprintf(ctx->href, ctx->hreflen, ctx->format, vec->index);
+	    make_filename(ctx->href, ctx->hreflen,
+			  ctx->format, ctx->rootpage,
+			  vec->index);
 	    htprintf(ctx, "<a href=\"%s\">", ctx->href);
 	    doing_href = 1;
 	}
@@ -427,7 +439,7 @@ int strcmptrailingpathsep(const char *a, const char *b)
 }
 
 char *html_query(const void *t, unsigned long index,
-		 const struct html_config *cfg)
+		 const struct html_config *cfg, int downlink)
 {
     struct html actx, *ctx = &actx;
     char *path, *path2, *p, *q, *href;
@@ -446,6 +458,7 @@ char *html_query(const void *t, unsigned long index,
     ctx->buflen = ctx->bufsize = 0;
     ctx->t = t;
     ctx->format = cfg->format;
+    ctx->rootpage = cfg->rootpage;
     htprintf(ctx, "<html>\n");
 
     path = snewn(1+trie_maxpathlen(t), char);
@@ -502,7 +515,7 @@ char *html_query(const void *t, unsigned long index,
 	index2 = trie_before(t, path);
 	trie_getpath(t, index2, path2);
 	if (!strcmptrailingpathsep(path, path2) && cfg->format) {
-	    snprintf(href, hreflen, cfg->format, index2);
+	    make_filename(href, hreflen, cfg->format, cfg->rootpage, index2);
 	    if (!*href)		       /* special case that we understand */
 		strcpy(href, "./");
 	    htprintf(ctx, "<a href=\"%s\">", href);
@@ -611,7 +624,7 @@ char *html_query(const void *t, unsigned long index,
 	    vecs = sresize(vecs, vecsize, struct vector *);
 	}
 	assert(strlen(path2) > pathlen);
-	vecs[nvecs] = make_vector(ctx, path2, (xj2 - xj1 > 1), 0,
+	vecs[nvecs] = make_vector(ctx, path2, downlink && (xj2 - xj1 > 1), 0,
 				  path2 + subdirpos, 1);
 	for (i = 0; i <= MAXCOLOUR; i++)
 	    vecs[0]->sizes[i] -= vecs[nvecs]->sizes[i];
@@ -643,4 +656,69 @@ char *html_query(const void *t, unsigned long index,
     sfree(vecs);
 
     return ctx->buf;
+}
+
+int html_dump(const void *t, unsigned long index, unsigned long endindex,
+	      int maxdepth, const struct html_config *cfg,
+	      const char *pathprefix)
+{
+    /*
+     * Determine the filename for this file.
+     */
+    assert(cfg->format != NULL);
+    int prefixlen = strlen(pathprefix);
+    int fnmax = strlen(pathprefix) + strlen(cfg->format) + 100;
+    char filename[fnmax];
+    strcpy(filename, pathprefix);
+    make_filename(filename + prefixlen, fnmax - prefixlen,
+		  cfg->format, cfg->rootpage, index);
+
+    /*
+     * Create the HTML itself. Don't write out downlinks from our
+     * deepest level.
+     */
+    char *html = html_query(t, index, cfg, maxdepth != 0);
+
+    /*
+     * Write it out.
+     */
+    FILE *fp = fopen(filename, "w");
+    if (!fp) {
+	fprintf(stderr, "%s: %s: open: %s\n", PNAME,
+		filename, strerror(errno));
+	return 1;
+    }
+    if (fputs(html, fp) < 0) {
+	fprintf(stderr, "%s: %s: write: %s\n", PNAME,
+		filename, strerror(errno));
+	fclose(fp);
+	return 1;
+    }
+    if (fclose(fp) < 0) {
+	fprintf(stderr, "%s: %s: fclose: %s\n", PNAME,
+		filename, strerror(errno));
+	return 1;
+    }
+
+    /*
+     * Recurse.
+     */
+    if (maxdepth != 0) {
+	unsigned long subindex, subendindex;
+	int newdepth = (maxdepth > 0 ? maxdepth - 1 : maxdepth);
+	char path[1+trie_maxpathlen(t)];
+
+	index++;
+	while (index < endindex) {
+	    trie_getpath(t, index, path);
+	    get_indices(t, path, &subindex, &subendindex);
+	    index = subendindex;
+	    if (subendindex - subindex > 1) {
+		if (html_dump(t, subindex, subendindex, newdepth,
+			      cfg, pathprefix))
+		    return 1;
+	    }
+	}
+    }
+    return 0;
 }

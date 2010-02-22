@@ -190,10 +190,10 @@ completely) and a username and password of your choice.
 
 \dd In this mode, \cw{agedu} generates a textual report on standard
 output, listing the disk usage in the specified directory and all
-its subdirectories down to a fixed depth. By default that depth is
+its subdirectories down to a given depth. By default that depth is
 1, so that you see a report for \e{directory} itself and all of its
-immediate subdirectories. You can configure a different depth using
-\cw{-d}, described in the next section.
+immediate subdirectories. You can configure a different depth (or no
+depth limit) using \cw{-d}, described in the next section.
 
 \lcont{
 
@@ -257,9 +257,18 @@ for further detail.)
 \dd In this mode, \cw{agedu} will generate an HTML report of the
 disk usage in the specified directory and its immediate
 subdirectories, in the same form that it serves from its web server
-in \cw{-w} mode. However, this time, a single HTML report will be
-generated and simply written to standard output, with no hyperlinks
-pointing to other similar pages.
+in \cw{-w} mode.
+
+\lcont{
+
+By default, a single HTML report will be generated and simply
+written to standard output, with no hyperlinks pointing to other
+similar pages. If you also specify the \cw{-d} option (see below),
+\cw{agedu} will instead write out a collection of HTML files with
+hyperlinks between them, and call the top-level file
+\cw{index.html}.
+
+}
 
 \U OPTIONS
 
@@ -466,6 +475,42 @@ the web server mode \cw{-w}, the stand-alone HTML generation mode
 \dd This option causes \cw{agedu}'s reports to list the individual
 files in each directory, instead of just giving a combined report
 for everything that's not in a subdirectory.
+
+The following options affect the stand-alone HTML generation mode
+\cw{-H} and the text report mode \cw{-t}.
+
+\dt \cw{-d} \e{depth} or \cw{--depth} \e{depth}
+
+\dd This option controls the maximum depth to which \cw{agedu}
+recurses when generating a text or HTML report.
+
+\lcont{
+
+In text mode, the default is 1, meaning that the report will include
+the directory given on the command line and all of its immediate
+subdirectories. A depth of two includes another level below that,
+and so on; a depth of zero means \e{only} the directory on the
+command line.
+
+In HTML mode, specifying this option switches \cw{agedu} from
+writing out a single HTML file to writing out multiple files which
+link to each other. A depth of 1 means \cw{agedu} will write out an
+HTML file for the given directory and also one for each of its
+immediate subdirectories.
+
+If you want \cw{agedu} to recurse as deeply as possible, give the
+special word \cq{max} as an argument to \cw{-d}.
+
+}
+
+\dt \cw{-o} \e{filename} or \cw{--output} \e{filename}
+
+\dd This option is used to specify an output file for \cw{agedu} to
+write its report to. In text mode or single-file HTML mode, the
+argument is treated as the name of a file. In multiple-file HTML
+mode, the argument is treated as the name of a directory: the
+directory will be created if it does not already exist, and the
+output HTML files will be created inside it.
 
 The following options affect the web server mode \cw{-w}, and in one
 case also the stand-alone HTML generation mode \cw{-H}:

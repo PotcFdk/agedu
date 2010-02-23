@@ -1,6 +1,13 @@
 TODO list for agedu
 ===================
 
+ - flexibility in the HTML report output mode: expose the internal
+   mechanism for configuring the output filenames, and allow the
+   user to request individual files with hyperlinks as if the other
+   files existed. (In particular, functionality of this kind would
+   enable other modes of use like the built-in --cgi mode, without
+   me having to anticipate them in detail.)
+
  - we could still be using more of the information coming from
    autoconf. Our config.h is defining a whole bunch of HAVE_FOOs for
    particular functions (e.g. HAVE_INET_NTOA, HAVE_MEMCHR,
@@ -45,26 +52,16 @@ TODO list for agedu
       HTML. Then the former can be reused to produce very similar
       reports in coloured plain text.
 
- - http://msdn.microsoft.com/en-us/library/ms724290.aspx suggest
-   modern Windowses support atime-equivalents, so a Windows port is
-   possible in principle.
-    + For a full Windows port, would need to modify the current
-      structure a lot, to abstract away (at least) memory-mapping of
-      files, details of disk scan procedure, networking for httpd.
-      Unclear what the right UI would be on Windows, too;
-      command-line exactly as now might be considered just a
-      _little_ unfriendly. Or perhaps not.
-       * Disk scan procedure: the FindFirstFile / FindNextFile
-	 functions to scan a directory automatically return the file
-	 times along with the filenames, so there's no need to stat
-	 them later. Would want to fiddle the shape of the
-	 abstraction layer to reflect this.
-    + Alternatively, a much easier approach would be to write a
-      Windows version of just the --scan-dump mode, which does a
-      filesystem scan via the Windows API and generates a valid
-      agedu dump file on standard output. Then one would simply feed
-      that over the network connection of one's choice to the rest
-      of agedu running on Unix as usual.
+ - abstracting away all the Unix calls so as to enable a full
+   Windows port. We can already do the difficult bit on Windows
+   (scanning the filesystem and retrieving atime-analogues).
+   Everything else is just coding - albeit quite a _lot_ of coding,
+   since the Unix assumptions are woven quite tightly into the
+   current code.
+    + If nothing else, it's unclear what the user interface properly
+      ought to be in a Windows port of agedu. A command-line job
+      exactly like the Unix version might be useful to some people,
+      but would certainly be strange and confusing to others.
 
  - it might conceivably be useful to support a choice of indexing
    strategies. The current "continuous index" mechanism' tradeoff of
@@ -78,3 +75,19 @@ TODO list for agedu
    and query time.
     * however, now we have the cut-down version of the continuous
       index, the space saving is less compelling.
+
+ - A user requested what's essentially a VFS layer: given multiple
+   index files and a map of how they fit into an overall namespace,
+   we should be able to construct the right answers for any query
+   about the resulting aggregated hierarchy by doing at most
+   O(number of indexes * normal number of queries) work.
+
+ - Support for filtering the scan by ownership and permissions. The
+   index data structure can't handle this, so we can't build a
+   single index file admitting multiple subset views; but a user
+   suggested that the scan phase could record information about
+   ownership and permissions in the dump file, and then the indexing
+   phase could filter down to a particular sub-view - which would at
+   least allow the construction of various subset indices from one
+   dump file, without having to redo the full disk scan which is the
+   most time-consuming part of all.

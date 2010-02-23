@@ -270,6 +270,25 @@ hyperlinks between them, and call the top-level file
 
 }
 
+\dt \cw{--cgi}
+
+\dd In this mode, \cw{agedu} will run as the bulk of a CGI script
+which provides the same set of web pages as the built-in web server
+would. It will read the usual CGI environment variables, and write
+CGI-style data to its standard output.
+
+\lcont{
+
+The actual CGI program itself should be a tiny wrapper around
+\cw{agedu} which passes it the \cw{--cgi} option, and also
+(probably) \cw{-f} to locate the index file. \cw{agedu} will do
+everything else.
+
+No access control is performed in this mode: restricting access to
+CGI scripts is assumed to be the job of the web server.
+
+}
+
 \U OPTIONS
 
 This section describes the various configuration options that affect

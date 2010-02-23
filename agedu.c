@@ -309,6 +309,8 @@ static void text_query(const void *mappedfile, const char *querydir,
 	HELPARG("directory") HELPOPT("scan only, generating a dump") \
     VAL(HTML) SHORT(H) LONG(html) \
 	HELPARG("subdir") HELPOPT("print an HTML report on a subdirectory") \
+    NOVAL(CGI) LONG(cgi) \
+        HELPOPT("do the right thing when run from a CGI script") \
     HELPPFX("options") \
     VAL(DATAFILE) SHORT(f) LONG(file) \
         HELPARG("filename") HELPOPT("[most modes] specify index file") \
@@ -712,12 +714,14 @@ int main(int argc, char **argv)
 		    nactions++;
 		    break;
 		  case OPT_HTML:
+		  case OPT_CGI:
 		    if (nactions >= actionsize) {
 			actionsize = nactions * 3 / 2 + 16;
 			actions = sresize(actions, actionsize, struct action);
 		    }
 		    actions[nactions].mode = HTML;
-		    actions[nactions].arg = optval;
+		    actions[nactions].arg = (optid == OPT_HTML ? optval :
+					     NULL);
 		    nactions++;
 		    break;
 		  case OPT_HTTPD:
@@ -1296,16 +1300,48 @@ int main(int argc, char **argv)
 	    if (fd < 0) {
 		fprintf(stderr, "%s: %s: open: %s\n", PNAME, filename,
 			strerror(errno));
+		if (!querydir) {
+		    printf("Status: 500\nContent-type: text/html\n\n"
+			   "<html><head>"
+			   "<title>500 Internal Server Error</title>"
+			   "</head><body>"
+			   "<h1>500 Internal Server Error</h1>"
+			   "<p><code>agedu</code> suffered an internal error."
+			   "</body></html>\n");
+		    return 0;
+		}
 		return 1;
 	    }
 	    if (fstat(fd, &st) < 0) {
-		perror(PNAME ": fstat");
+		fprintf(stderr, "%s: %s: fstat: %s\n", PNAME, filename,
+			strerror(errno));
+		if (!querydir) {
+		    printf("Status: 500\nContent-type: text/html\n\n"
+			   "<html><head>"
+			   "<title>500 Internal Server Error</title>"
+			   "</head><body>"
+			   "<h1>500 Internal Server Error</h1>"
+			   "<p><code>agedu</code> suffered an internal error."
+			   "</body></html>\n");
+		    return 0;
+		}
 		return 1;
 	    }
 	    totalsize = st.st_size;
 	    mappedfile = mmap(NULL, totalsize, PROT_READ, MAP_SHARED, fd, 0);
 	    if (!mappedfile) {
-		perror(PNAME ": mmap");
+		fprintf(stderr, "%s: %s: mmap: %s\n", PNAME, filename,
+			strerror(errno));
+		if (!querydir) {
+		    printf("Status: 500\nContent-type: text/html\n\n"
+			   "<html><head>"
+			   "<title>500 Internal Server Error</title>"
+			   "</head><body>"
+			   "<h1>500 Internal Server Error</h1>"
+			   "<p><code>agedu</code> suffered an internal error."
+			   "</body></html>\n");
+		    return 0;
+		}
 		return 1;
 	    }
 	    pathsep = trie_pathsep(mappedfile);
@@ -1313,38 +1349,132 @@ int main(int argc, char **argv)
 	    maxpathlen = trie_maxpathlen(mappedfile);
 	    pathbuf = snewn(maxpathlen, char);
 
-	    /*
-	     * Trim trailing slash, just in case.
-	     */
-	    pathlen = strlen(querydir);
-	    if (pathlen > 0 && querydir[pathlen-1] == pathsep)
-		querydir[--pathlen] = '\0';
+	    if (!querydir) {
+		/*
+		 * If we're run in --cgi mode, read PATH_INFO to get
+		 * a numeric pathname index.
+		 */
+		char *path_info = getenv("PATH_INFO");
 
-	    xi = trie_before(mappedfile, querydir);
-	    if (xi >= trie_count(mappedfile) ||
-		(trie_getpath(mappedfile, xi, pathbuf),
-		 strcmp(pathbuf, querydir))) {
-		fprintf(stderr, "%s: pathname '%s' does not exist in index\n"
-			"%*s(check it is spelled exactly as it is in the "
-			"index, including\n%*sany leading './')\n",
-			PNAME, querydir,
-			(int)(1+sizeof(PNAME)), "",
-			(int)(1+sizeof(PNAME)), "");
-	    } else if (!index_has_root(mappedfile, xi)) {
-		fprintf(stderr, "%s: pathname '%s' is"
-			" a file, not a directory\n", PNAME, querydir);
-	    } else if (!gotdepth) {
+		if (!path_info)
+		    path_info = "";
+
+		/*
+		 * Because we need relative links to go to the
+		 * right place, it's important that our
+		 * PATH_INFO should contain a slash right at the
+		 * start, and no slashes anywhere else.
+		 */
+		if (path_info[0] != '/') {
+		    char *servername = getenv("SERVER_NAME");
+		    char *scriptname = getenv("SCRIPT_NAME");
+		    if (!servername || !scriptname) {
+			if (servername)
+			    fprintf(stderr, "%s: SCRIPT_NAME unset\n", PNAME);
+			else if (scriptname)
+			    fprintf(stderr, "%s: SCRIPT_NAME unset\n", PNAME);
+			else
+			    fprintf(stderr, "%s: SERVER_NAME and "
+				    "SCRIPT_NAME both unset\n", PNAME);
+			printf("Status: 500\nContent-type: text/html\n\n"
+			       "<html><head>"
+			       "<title>500 Internal Server Error</title>"
+			       "</head><body>"
+			       "<h1>500 Internal Server Error</h1>"
+			       "<p><code>agedu</code> suffered an internal "
+			       "error."
+			       "</body></html>\n");
+			return 0;
+		    }
+		    printf("Status: 301\n"
+			   "Location: http://%s/%s/\n"
+			   "Content-type: text/html\n\n"
+			   "<html><head>"
+			   "<title>301 Moved</title>"
+			   "</head><body>"
+			   "<h1>301 Moved</h1>"
+			   "<p>Moved."
+			   "</body></html>\n",
+			   servername, scriptname);
+		    return 0;
+		} else if (strchr(path_info+1, '/')) {
+		    printf("Status: 404\nContent-type: text/html\n\n"
+			   "<html><head>"
+			   "<title>404 Not Found</title>"
+			   "</head><body>"
+			   "<h1>400 Not Found</h1>"
+			   "<p>Invalid <code>agedu</code> pathname."
+			   "</body></html>\n");
+		    return 0;
+		}
+		xi = atoi(path_info + 1);
+
+		if (xi >= trie_count(mappedfile)) {
+		    printf("Status: 404\nContent-type: text/html\n\n"
+			   "<html><head>"
+			   "<title>404 Not Found</title>"
+			   "</head><body>"
+			   "<h1>400 Not Found</h1>"
+			   "<p>This is not a valid pathname index."
+			   "</body></html>\n");
+		    return 0;
+		} else if (!index_has_root(mappedfile, xi)) {
+		    printf("Status: 404\nContent-type: text/html\n\n"
+			   "<html><head>"
+			   "<title>404 Not Found</title>"
+			   "</head><body>"
+			   "<h1>404 Not Found</h1>"
+			   "<p>Pathname index out of range."
+			   "</body></html>\n");
+		    return 0;
+		}
+	    } else {
+		/*
+		 * In ordinary --html mode, process a query
+		 * directory passed in on the command line.
+		 */
+
+		/*
+		 * Trim trailing slash, just in case.
+		 */
+		pathlen = strlen(querydir);
+		if (pathlen > 0 && querydir[pathlen-1] == pathsep)
+		    querydir[--pathlen] = '\0';
+
+		xi = trie_before(mappedfile, querydir);
+		if (xi >= trie_count(mappedfile) ||
+		    (trie_getpath(mappedfile, xi, pathbuf),
+		     strcmp(pathbuf, querydir))) {
+		    fprintf(stderr, "%s: pathname '%s' does not exist in index\n"
+			    "%*s(check it is spelled exactly as it is in the "
+			    "index, including\n%*sany leading './')\n",
+			    PNAME, querydir,
+			    (int)(1+sizeof(PNAME)), "",
+			    (int)(1+sizeof(PNAME)), "");
+		    return 1;
+		} else if (!index_has_root(mappedfile, xi)) {
+		    fprintf(stderr, "%s: pathname '%s' is"
+			    " a file, not a directory\n", PNAME, querydir);
+		    return 1;
+		}
+	    }
+
+	    if (!querydir || !gotdepth) {
 		/*
 		 * Single output file.
 		 */
-		cfg.format = NULL;
+		if (!querydir) {
+		    cfg.format = "%.0lu";  /* use crosslinks in --cgi mode */
+		} else {
+		    cfg.format = NULL;
+		}
 		cfg.rootpage = NULL;
 		cfg.autoage = htmlautoagerange;
 		cfg.oldest = htmloldest;
 		cfg.newest = htmlnewest;
 		cfg.showfiles = showfiles;
-		html = html_query(mappedfile, xi, &cfg, 0);
-		if (outfile != NULL) {
+		html = html_query(mappedfile, xi, &cfg, 1);
+		if (querydir && outfile != NULL) {
 		    FILE *fp = fopen(outfile, "w");
 		    if (!fp) {
 			fprintf(stderr, "%s: %s: open: %s\n", PNAME,
@@ -1361,6 +1491,9 @@ int main(int argc, char **argv)
 			return 1;
 		    }
 		} else {
+		    if (!querydir) {
+			printf("Content-type: text/html\n\n");
+		    }
 		    fputs(html, stdout);
 		}
 	    } else {
@@ -1380,6 +1513,12 @@ int main(int argc, char **argv)
 		    snprintf(prefix, dirlen, "./");
 
 		unsigned long xi2;
+		/*
+		 * pathbuf is only set up in the plain-HTML case and
+		 * not in the CGI case; but that's OK, because the
+		 * CGI case can't come to this branch of the if
+		 * anyway.
+		 */
 		make_successor(pathbuf);
 		xi2 = trie_before(mappedfile, pathbuf);
 

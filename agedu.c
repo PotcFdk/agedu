@@ -1414,7 +1414,7 @@ int main(int argc, char **argv)
 			   "<html><head>"
 			   "<title>404 Not Found</title>"
 			   "</head><body>"
-			   "<h1>400 Not Found</h1>"
+			   "<h1>404 Not Found</h1>"
 			   "<p>This is not a valid pathname index."
 			   "</body></html>\n");
 		    return 0;

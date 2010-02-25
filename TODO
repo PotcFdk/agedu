@@ -8,6 +8,12 @@ TODO list for agedu
    enable other modes of use like the built-in --cgi mode, without
    me having to anticipate them in detail.)
 
+ - add the option (and perhaps even make it default) to address HTML
+   subpages by pathname rather than by index number. More than just
+   cosmetic: it means that in a scenario where agedu --cgi is always
+   running but the index file is updated by cron, subsidiary
+   pathnames will remain valid across a change.
+
  - we could still be using more of the information coming from
    autoconf. Our config.h is defining a whole bunch of HAVE_FOOs for
    particular functions (e.g. HAVE_INET_NTOA, HAVE_MEMCHR,

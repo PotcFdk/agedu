@@ -69,11 +69,11 @@ struct indexbuild {
 };
 
 #define ELEMENT(t,offset) \
-    ((offset) ? (struct trie_file *)((char *)(t) + (offset)) : NULL)
+    ((struct trie_file *) ((offset) ? ((char *)(t) + (offset)) : NULL))
 #define NODE(t,offset) \
-    ((offset) ? (struct avlnode *)((char *)(t) + (offset)) : NULL)
+    ((struct avlnode *) ((offset) ? ((char *)(t) + (offset)) : NULL))
 #define OFFSET(t,node) \
-    ((node) ? (off_t)((const char *)node - (const char *)t) : 0)
+    ((node) ? (off_t)((const char *)node - (const char *)t) : (off_t)0)
 #define MAXDEPTH(node) ((node) ? (node)->maxdepth : 0)
 
 indexbuild *indexbuild_new(void *t, off_t startoff, int nodecount,

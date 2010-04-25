@@ -484,6 +484,7 @@ static unsigned long long fake_atime_recurse(void *t, struct trie_common *node,
 
 	return max;
     }
+    return 0;			       /* placate lint */
 }
 
 void trie_fake_dir_atimes(void *t)

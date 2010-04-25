@@ -393,8 +393,8 @@ enum { OPTIONS(IGNORE,IGNORE,IGNORE,LONGTMP) NLONGOPTS };
 static const int opthasval[NOPTIONS] = {OPTIONS(ZERO,ONE,IGNORE,IGNORE)};
 static const char shortopts[] = {OPTIONS(IGNORE,IGNORE,STRINGNOCOMMA,IGNORE)};
 static const char *const longopts[] = {OPTIONS(IGNORE,IGNORE,IGNORE,STRING)};
-enum { OPTIONS(SHORTNEWOPT,SHORTNEWOPT,SHORTTHISOPT,IGNORE) };
-enum { OPTIONS(LONGNEWOPT,LONGNEWOPT,IGNORE,LONGTHISOPT) };
+enum { OPTIONS(SHORTNEWOPT,SHORTNEWOPT,SHORTTHISOPT,IGNORE) UNUSEDENUMVAL1 };
+enum { OPTIONS(LONGNEWOPT,LONGNEWOPT,IGNORE,LONGTHISOPT) UNUSEDENUMVAL2 };
 static const int shortvals[] = {OPTIONS(IGNORE,IGNORE,SHORTOPTVAL,IGNORE)};
 static const int longvals[] = {OPTIONS(IGNORE,IGNORE,IGNORE,LONGOPTVAL)};
 
@@ -664,8 +664,6 @@ int main(int argc, char **argv)
 
 			for (i = 0; licence[i]; i++)
 			    fputs(licence[i], stdout);
-
-			return 0;
 		    }
 		    return 0;
 		  case OPT_SCAN:
@@ -1133,6 +1131,7 @@ int main(int argc, char **argv)
 		prevbuf[0] = '\0';
 		tf = triewalk_next(tw, buf);
 		assert(tf);
+		prevtf = NULL;	       /* placate lint */
 		while (1) {
 		    int i;
 

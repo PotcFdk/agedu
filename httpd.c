@@ -90,7 +90,7 @@ char *got_data(struct connctx *ctx, char *data, int length,
 	       const struct html_config *cfg)
 {
     char *line, *p, *q, *r, *z1, *z2, c1, c2;
-    int auth_provided = 0, auth_correct = 0;
+    int auth_correct = 0;
     unsigned long index;
     char *document, *ret;
 
@@ -235,7 +235,6 @@ char *got_data(struct connctx *ctx, char *data, int length,
 		    p = q;
 	    }
 	    if (p < q) {
-		auth_provided = 1;
 		while (p < q && isspace((unsigned char)*p))
 		    p++;
 		r = p;
@@ -414,7 +413,6 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
     int fd, ret;
     int authtype;
     char *authstring = NULL;
-    struct fd *f;
     struct sockaddr_in addr;
     socklen_t addrlen;
     struct html_config cfg = *incfg;
@@ -575,7 +573,7 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
     /*
      * Now construct an fd structure to hold it.
      */
-    f = new_fdstruct(fd, FD_LISTENER);
+    new_fdstruct(fd, FD_LISTENER);
 
     /*
      * Read from standard input, and treat EOF as a notification

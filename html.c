@@ -570,7 +570,7 @@ char *html_query(const void *t, unsigned long index,
     }
     htprintf(ctx, "<p align=center>Key to colour coding (mouse over for more detail):\n");
     htprintf(ctx, "<p align=center style=\"padding: 0; margin-top:0.4em; "
-	     "margin-bottom:1em\"");
+	     "margin-bottom:1em\">");
     begin_colour_bar(ctx);
     htprintf(ctx, "<td style=\"padding-right:1em\">%s</td>\n", agebuf1);
     for (i = 0; i < MAXCOLOUR; i++)

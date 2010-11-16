@@ -1,4 +1,4 @@
-# autoconf input for agedu. -*- sh -*-
+# autoconf input for agedu.
 
 AC_INIT([agedu], [6.66], [anakin@pobox.com])
 AC_CONFIG_SRCDIR([agedu.c])
@@ -32,10 +32,13 @@ AC_FUNC_MMAP
 AC_FUNC_SELECT_ARGTYPES
 AC_FUNC_STRFTIME
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS([ftruncate fdopendir inet_ntoa lstat64 stat64 memchr munmap select socket strcasecmp strchr strcspn strerror strrchr strspn strtoul strtoull])
 
 AC_SEARCH_LIBS(connect, socket nsl)
-# AC_SEARCH_LIBS(gethostbyname, socket nsl resolv)
+AC_SEARCH_LIBS(inet_ntoa, socket nsl)
+AC_SEARCH_LIBS(inet_addr, socket nsl)
+# AC_SEARCH_LIBS(gethostbyname, socket nsl resolv) # (if we used gethostbyname)
+
+AC_CHECK_FUNCS([ftruncate fdopendir lstat64 stat64 memchr munmap select socket strcasecmp strchr strcspn strerror strrchr strspn strtoul strtoull connect inet_ntoa inet_addr])
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

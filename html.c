@@ -325,12 +325,17 @@ static void compute_display_size(unsigned long long size,
 	"%#.1f Pb", "%#.1f Eb", "%#.1f Zb", "%#.1f Yb"
     };
     int shift = 0;
+    unsigned long long tmpsize;
+    double denominator;
 
-    while (size >= 1024 && shift < lenof(fmts)-1) {
-	size >>= 10;
+    tmpsize = size;
+    denominator = 1.0;
+    while (tmpsize >= 1024 && shift < lenof(fmts)-1) {
+	tmpsize >>= 10;
+        denominator *= 1024.0;
 	shift++;
     }
-    *display_size = (double)size;
+    *display_size = size / denominator;
     *fmt = fmts[shift];
 }
 

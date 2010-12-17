@@ -341,6 +341,8 @@ static void text_query(const void *mappedfile, const char *querydir,
         HELPOPT("[--scan,--load] keep real atimes on directories") \
     NOVAL(NODIRATIME) LONG(no_dir_atime) LONG(no_dir_atimes) \
         HELPOPT("[--scan,--load] fake atimes on directories") \
+    NOVAL(NOEOF) LONG(no_eof) LONG(noeof) \
+        HELPOPT("[--web] do not close web server on EOF") \
     NOVAL(MTIME) LONG(mtime) \
         HELPOPT("[--scan] use mtime instead of atime") \
     NOVAL(SHOWFILES) LONG(files) \
@@ -510,6 +512,7 @@ int main(int argc, char **argv)
     int depth = -1, gotdepth = 0;
     int fakediratimes = 1;
     int mtime = 0;
+    int closeoneof = 1;
     int showfiles = 0;
 
 #ifdef DEBUG_MAD_OPTION_PARSING_MACROS
@@ -767,6 +770,9 @@ int main(int argc, char **argv)
 		  case OPT_MTIME:
 		    mtime = 1;
 		    break;
+                  case OPT_NOEOF:
+                    closeoneof = 0;
+                    break;
 		  case OPT_DATAFILE:
 		    filename = optval;
 		    break;
@@ -1589,6 +1595,7 @@ int main(int argc, char **argv)
 
 	    dcfg.address = httpserveraddr;
 	    dcfg.port = httpserverport;
+	    dcfg.closeoneof = closeoneof;
 	    dcfg.basicauthdata = httpauthdata;
 	    pcfg.format = NULL;
 	    pcfg.rootpage = NULL;

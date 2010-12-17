@@ -10,6 +10,7 @@
 struct httpd_config {
     const char *address;
     int port;
+    int closeoneof;
     const char *basicauthdata;
 };
 

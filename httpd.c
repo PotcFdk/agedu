@@ -569,17 +569,20 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
 	printf("URL: http://%s:%d/\n",
 	       inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
     }
+    fflush(stdout);
 
     /*
      * Now construct an fd structure to hold it.
      */
     new_fdstruct(fd, FD_LISTENER);
 
-    /*
-     * Read from standard input, and treat EOF as a notification
-     * to exit.
-     */
-    new_fdstruct(0, FD_CLIENT);
+    if (dcfg->closeoneof) {
+        /*
+         * Read from standard input, and treat EOF as a notification
+         * to exit.
+         */
+       new_fdstruct(0, FD_CLIENT);
+    }
 
     /*
      * Now we're ready to run our main loop. Keep looping round on

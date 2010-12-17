@@ -166,10 +166,11 @@ default it invents its own URL and prints it out.
 
 \lcont{
 
-The web server runs until \cw{agedu} receives an end-of-file event
-on its standard input. (The expected usage is that you run it from
-the command line, immediately browse web pages until you're
-satisfied, and then press Ctrl-D.)
+The web server runs until \cw{agedu} receives an end-of-file event on
+its standard input. (The expected usage is that you run it from the
+command line, immediately browse web pages until you're satisfied, and
+then press Ctrl-D.) To disable the EOF behaviour, use the
+\cw{--no-eof} option.
 
 In case the index file contains any confidential information about
 your file system, the web server protects the pages it serves from
@@ -637,6 +638,11 @@ given file descriptor which you should have arranged to pass to
 consist of the username, followed by a colon, followed by the
 password, followed \e{immediately} by end of file (no trailing
 newline, or else it will be considered part of the password).
+
+\dt \cw{--no-eof}
+
+\dd Stop \cw{agedu} in web server mode from looking for end-of-file on
+standard input and treating it as a signal to terminate.
 
 \U LIMITATIONS
 

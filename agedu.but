@@ -486,6 +486,18 @@ things as disused when they're not, so you will have more candidates
 to go through by hand looking for data you don't need), but may be
 better than nothing if your last-access times are unhelpful.
 
+\lcont{
+
+Another use for this mode might be to find \e{recently created}
+large data. If your disk has been gradually filling up for years,
+the default mode of \cw{agedu} will let you find unused data to
+delete; but if you know your disk had plenty of space recently and
+now it's suddenly full, and you suspect that some rogue program has
+left a large core dump or output file, then \cw{agedu --mtime} might
+be a convenient way to locate the culprit.
+
+}
+
 The following option affects all the modes that generate reports:
 the web server mode \cw{-w}, the stand-alone HTML generation mode
 \cw{-H} and the text report mode \cw{-t}.

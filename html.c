@@ -16,9 +16,9 @@ struct html {
     const void *t;
     unsigned long long totalsize, oldest, newest;
     char *path2;
-    char *href;
+    char *oururi;
     size_t hreflen;
-    const char *format, *rootpage;
+    const char *uriformat;
     unsigned long long thresholds[MAXCOLOUR];
     char *titletexts[MAXCOLOUR+1];
     time_t now;
@@ -339,14 +339,384 @@ static void compute_display_size(unsigned long long size,
     *fmt = fmts[shift];
 }
 
-static void make_filename(char *buf, size_t buflen,
-			  const char *format, const char *rootpage,
-			  unsigned long index)
+struct format_option {
+    const char *prefix, *suffix;       /* may include '%%' */
+    int prefixlen, suffixlen;          /* does not count '%%' */
+    char fmttype;                      /* 0 for none, or 'n' or 'p' */
+    int translate_pathsep;             /* pathsep rendered as '/'? */
+    int shorten_path;                  /* omit common prefix? */
+};
+
+/*
+ * Gets the next format option from a format string. Advances '*fmt'
+ * past it, or sets it to NULL if nothing is left.
+ */
+struct format_option get_format_option(const char **fmt)
 {
-    if (index == 0 && rootpage)
-	snprintf(buf, buflen, "%s", rootpage);
-    else
-	snprintf(buf, buflen, format, index);
+    struct format_option ret;
+
+    /*
+     * Scan for prefix of format.
+     */
+    ret.prefix = *fmt;
+    ret.prefixlen = 0;
+    while (1) {
+        if (**fmt == '\0') {
+            /*
+             * No formatting directive, and this is the last option.
+             */
+            ret.suffix = *fmt;
+            ret.suffixlen = 0;
+            ret.fmttype = '\0';
+            *fmt = NULL;
+            return ret;
+        } else if (**fmt == '%') {
+            if ((*fmt)[1] == '%') {
+                (*fmt) += 2;           /* just advance one extra */
+                ret.prefixlen++;
+            } else if ((*fmt)[1] == '|') {
+                /*
+                 * No formatting directive.
+                 */
+                ret.suffix = *fmt;
+                ret.suffixlen = 0;
+                ret.fmttype = '\0';
+                (*fmt) += 2;           /* advance to start of next option */
+                return ret;
+            } else {
+                break;
+            }
+        } else {
+            (*fmt)++;                  /* normal character */
+            ret.prefixlen++;
+        }
+    }
+
+    /*
+     * Interpret formatting directive with flags.
+     */
+    (*fmt)++;
+    ret.translate_pathsep = ret.shorten_path = 1;
+    while (1) {
+        char c = *(*fmt)++;
+        assert(c);
+        if (c == '/') {
+            ret.translate_pathsep = 0;
+        } else if (c == '-') {
+            ret.shorten_path = 0;
+        } else {
+            assert(c == 'n' || c == 'p');
+            ret.fmttype = c;
+            break;
+        }
+    }
+
+    /*
+     * Scan for suffix.
+     */
+    ret.suffix = *fmt;
+    ret.suffixlen = 0;
+    while (1) {
+        if (**fmt == '\0') {
+            /*
+             * This is the last option.
+             */
+            *fmt = NULL;
+            return ret;
+        } else if (**fmt != '%') {
+            (*fmt)++;                  /* normal character */
+            ret.suffixlen++;
+        } else {
+            if ((*fmt)[1] == '%') {
+                (*fmt) += 2;           /* just advance one extra */
+                ret.suffixlen++;
+            } else {
+                assert((*fmt)[1] == '|');
+                (*fmt) += 2;           /* advance to start of next option */
+                return ret;
+            }
+        }
+    }
+}
+
+char *format_string(const char *fmt, unsigned long index, const void *t)
+{
+    int maxlen;
+    char *ret = NULL, *p = NULL;
+    char *path = NULL, *q = NULL;
+    char pathsep = trie_pathsep(t);
+    int maxpathlen = trie_maxpathlen(t);
+
+    while (fmt) {
+        struct format_option opt = get_format_option(&fmt);
+        if (index && !opt.fmttype)
+            continue; /* option is only good for the root, which this isn't */
+
+        maxlen = opt.prefixlen + opt.suffixlen + 1;
+        switch (opt.fmttype) {
+          case 'n':
+            maxlen += 40;              /* generous length for an integer */
+            break;
+          case 'p':
+            maxlen += 3*maxpathlen;    /* might have to escape everything */
+            break;
+        }
+        ret = snewn(maxlen, char);
+        p = ret;
+        while (opt.prefixlen-- > 0) {
+            if ((*p++ = *opt.prefix++) == '%')
+                opt.prefix++;
+        }
+        switch (opt.fmttype) {
+          case 'n':
+            p += sprintf(p, "%lu", index);
+            break;
+          case 'p':
+            path = snewn(1+trie_maxpathlen(t), char);
+            if (opt.shorten_path) {
+                trie_getpath(t, 0, path);
+                q = path + strlen(path);
+                trie_getpath(t, index, path);
+                if (*q == pathsep)
+                    q++;
+            } else {
+                trie_getpath(t, index, path);
+                q = path;
+            }
+            while (*q) {
+                char c = *q++;
+                if (c == pathsep && opt.translate_pathsep)
+                    *p++ = '/';
+                else if (!isalnum((unsigned char)c) && !strchr("-.@_", c))
+                    p += sprintf(p, "=%02X", (unsigned char)c);
+                else
+                    *p++ = c;
+            }
+            sfree(path);
+            break;
+        }
+        while (opt.suffixlen-- > 0) {
+            if ((*p++ = *opt.suffix++) == '%')
+                opt.suffix++;
+        }
+        *p = '\0';
+        assert(p - ret < maxlen);
+        return ret;
+    }
+    assert(!"Getting here implies an incomplete set of formats");
+}
+
+char *html_format_path(const void *t, const struct html_config *cfg,
+                       unsigned long index)
+{
+    return format_string(cfg->uriformat, index, t);
+}
+
+int html_parse_path(const void *t, const char *path,
+                    const struct html_config *cfg, unsigned long *index)
+{
+    int len = strlen(path);
+    int midlen;
+    const char *p, *q;
+    char *r;
+    char pathsep = trie_pathsep(t);
+    const char *fmt = cfg->uriformat;
+
+    while (fmt) {
+        struct format_option opt = get_format_option(&fmt);
+
+        /*
+         * Check prefix and suffix.
+         */
+        midlen = len - opt.prefixlen - opt.suffixlen;
+        if (midlen < 0)
+            continue;                  /* prefix and suffix don't even fit */
+
+        p = path;
+        while (opt.prefixlen > 0) {
+            char c = *opt.prefix++;
+            if (c == '%')
+                opt.prefix++;
+            if (*p != c)
+                break;
+            p++;
+            opt.prefixlen--;
+        }
+        if (opt.prefixlen > 0)
+            continue;                  /* prefix didn't match */
+
+        q = path + len - opt.suffixlen;
+        while (opt.suffixlen > 0) {
+            char c = *opt.suffix++;
+            if (c == '%')
+                opt.suffix++;
+            if (*q != c)
+                break;
+            q++;
+            opt.suffixlen--;
+        }
+        if (opt.suffixlen > 0)
+            continue;                  /* suffix didn't match */
+
+        /*
+         * Check the data in between. p points at it, and it's midlen
+         * characters long.
+         */
+        if (opt.fmttype == '\0') {
+            if (midlen == 0) {
+                /*
+                 * Successful match against a root format.
+                 */
+                *index = 0;
+                return 1;
+            }
+        } else if (opt.fmttype == 'n') {
+            *index = 0;
+            while (midlen > 0) {
+                if (*p >= '0' && *p <= '9')
+                    *index = *index * 10 + (*p - '0');
+                else
+                    break;
+                midlen--;
+                p++;
+            }
+            if (midlen == 0) {
+                /*
+                 * Successful match against a numeric format.
+                 */
+                return 1;
+            }
+        } else {
+            assert(opt.fmttype == 'p');
+
+            int maxoutlen = trie_maxpathlen(t) + 1;
+            int maxinlen = midlen + 1;
+            char triepath[maxinlen+maxoutlen];
+
+            if (opt.shorten_path) {
+                trie_getpath(t, 0, triepath);
+                r = triepath + strlen(triepath);
+                if (r > triepath && r[-1] != pathsep)
+                    *r++ = pathsep;
+            } else {
+                r = triepath;
+            }
+
+            while (midlen > 0) {
+                if (*p == '/' && opt.translate_pathsep) {
+                    *r++ = pathsep;
+                    p++;
+                    midlen--;
+                } else if (*p == '=') {
+                    if (midlen < 3 ||
+                        !isxdigit((unsigned char)p[1]) ||
+                        !isxdigit((unsigned char)p[2]))
+                        break;         /* faulty escape encoding */
+                    char x[3];
+                    unsigned cval;
+                    x[0] = p[1];
+                    x[1] = p[2];
+                    x[2] = '\0';
+                    sscanf(x, "%x", &cval);
+                    *r++ = cval;
+                    p += 3;
+                    midlen -= 3;
+                } else {
+                    *r++ = *p;
+                    p++;
+                    midlen--;
+                }
+            }
+            if (midlen > 0)
+                continue;      /* something went wrong in that loop */
+            assert(r - triepath < maxinlen+maxoutlen);
+            *r = '\0';
+
+            unsigned long gotidx = trie_before(t, triepath);
+            if (gotidx >= trie_count(t))
+                continue;              /* index out of range */
+            char retpath[1+maxoutlen];
+            trie_getpath(t, gotidx, retpath);
+            if (strcmp(triepath, retpath))
+                continue;           /* exact path not found in trie */
+            if (!index_has_root(t, gotidx))
+                continue;              /* path is not a directory */
+
+            /*
+             * Successful path-based match.
+             */
+            *index = gotidx;
+            return 1;
+        }
+    }
+
+    return 0;                    /* no match from any format option */
+}
+
+char *make_href(const char *source, const char *target)
+{
+    /*
+     * We insist that both source and target URIs start with a /, or
+     * else we won't be reliably able to construct relative hrefs
+     * between them (e.g. because we've got a suffix on the end of
+     * some CGI pathname that this function doesn't know the final
+     * component of).
+     */
+    assert(*source == '/');
+    assert(*target == '/');
+
+    /*
+     * Find the last / in source. Everything up to but not including
+     * that is the directory to which the output href will be
+     * relative. We enforce by assertion that there must be a /
+     * somewhere in source, or else we can't construct a relative href
+     * at all
+     */
+    const char *sourceend = strrchr(source, '/');
+    assert(sourceend != NULL);
+
+    /*
+     * See how far the target URI agrees with the source one, up to
+     * and including that /.
+     */
+    const char *s = source, *t = target;
+    while (s <= sourceend && *s == *t)
+        s++, t++;
+
+    /*
+     * We're only interested in agreement of complete path components,
+     * so back off until we're sitting just after a shared /.
+     */
+    while (s > source && s[-1] != '/')
+        s--, t--;
+    assert(s > source);
+
+    /*
+     * Now we need some number of levels of "../" to get from source
+     * to here, and then we just replicate the rest of 'target'.
+     */
+    int levels = 0;
+    while (s <= sourceend) {
+        if (*s == '/')
+            levels++;
+        s++;
+    }
+    int len = 3*levels + strlen(t);
+    if (len == 0) {
+        /* One last special case: if target has no tail _and_ we
+         * haven't written out any "../". */
+        return dupstr("./");
+    } else {
+        char *ret = snewn(len+1, char);
+        char *p = ret;
+        while (levels-- > 0) {
+            *p++ = '.';
+            *p++ = '.';
+            *p++ = '/';
+        }
+        strcpy(p, t);
+        return ret;
+    }
 }
 
 #define PIXEL_SIZE 600		       /* FIXME: configurability? */
@@ -413,11 +783,13 @@ static void write_report_line(struct html *ctx, struct vector *vec)
     if (vec->name) {
 	int doing_href = 0;
 
-	if (ctx->format && vec->want_href) {
-	    make_filename(ctx->href, ctx->hreflen,
-			  ctx->format, ctx->rootpage,
-			  vec->index);
-	    htprintf(ctx, "<a href=\"%s\">", ctx->href);
+	if (ctx->uriformat && vec->want_href) {
+	    char *targeturi = format_string(ctx->uriformat, vec->index,
+                                            ctx->t);
+            char *link = make_href(ctx->oururi, targeturi);
+	    htprintf(ctx, "<a href=\"%s\">", link);
+            sfree(link);
+            sfree(targeturi);
 	    doing_href = 1;
 	}
 	if (vec->literal)
@@ -447,9 +819,9 @@ char *html_query(const void *t, unsigned long index,
 		 const struct html_config *cfg, int downlink)
 {
     struct html actx, *ctx = &actx;
-    char *path, *path2, *p, *q, *href;
+    char *path, *path2, *p, *q;
     char agebuf1[80], agebuf2[80];
-    size_t pathlen, subdirpos, hreflen;
+    size_t pathlen, subdirpos;
     unsigned long index2;
     int i;
     struct vector **vecs;
@@ -462,21 +834,12 @@ char *html_query(const void *t, unsigned long index,
     ctx->buf = NULL;
     ctx->buflen = ctx->bufsize = 0;
     ctx->t = t;
-    ctx->format = cfg->format;
-    ctx->rootpage = cfg->rootpage;
+    ctx->uriformat = cfg->uriformat;
     htprintf(ctx, "<html>\n");
 
     path = snewn(1+trie_maxpathlen(t), char);
     ctx->path2 = path2 = snewn(1+trie_maxpathlen(t), char);
-    if (cfg->format) {
-	hreflen = strlen(cfg->format) + 100;
-	href = snewn(hreflen, char);
-    } else {
-	hreflen = 0;
-	href = NULL;
-    }
-    ctx->hreflen = hreflen;
-    ctx->href = href;
+    ctx->oururi = format_string(cfg->uriformat, index, t);
 
     /*
      * HEAD section.
@@ -519,11 +882,12 @@ char *html_query(const void *t, unsigned long index,
 	*zp = '\0';
 	index2 = trie_before(t, path);
 	trie_getpath(t, index2, path2);
-	if (!strcmptrailingpathsep(path, path2) && cfg->format) {
-	    make_filename(href, hreflen, cfg->format, cfg->rootpage, index2);
-	    if (!*href)		       /* special case that we understand */
-		strcpy(href, "./");
-	    htprintf(ctx, "<a href=\"%s\">", href);
+	if (!strcmptrailingpathsep(path, path2) && cfg->uriformat) {
+	    char *targeturi = format_string(cfg->uriformat, index2, t);
+            char *link = make_href(ctx->oururi, targeturi);
+	    htprintf(ctx, "<a href=\"%s\">", link);
+            sfree(link);
+            sfree(targeturi);
 	    doing_href = 1;
 	}
 	*zp = c;
@@ -651,7 +1015,7 @@ char *html_query(const void *t, unsigned long index,
      */
     htprintf(ctx, "</body>\n");
     htprintf(ctx, "</html>\n");
-    sfree(href);
+    sfree(ctx->oururi);
     sfree(path2);
     sfree(path);
     for (i = 0; i < nvecs; i++) {
@@ -670,13 +1034,10 @@ int html_dump(const void *t, unsigned long index, unsigned long endindex,
     /*
      * Determine the filename for this file.
      */
-    assert(cfg->format != NULL);
-    int prefixlen = strlen(pathprefix);
-    int fnmax = strlen(pathprefix) + strlen(cfg->format) + 100;
-    char filename[fnmax];
-    strcpy(filename, pathprefix);
-    make_filename(filename + prefixlen, fnmax - prefixlen,
-		  cfg->format, cfg->rootpage, index);
+    assert(cfg->fileformat != NULL);
+    char *filename = format_string(cfg->fileformat, index, t);
+    char *path = dupfmt("%s%s", pathprefix, filename);
+    sfree(filename);
 
     /*
      * Create the HTML itself. Don't write out downlinks from our
@@ -687,23 +1048,21 @@ int html_dump(const void *t, unsigned long index, unsigned long endindex,
     /*
      * Write it out.
      */
-    FILE *fp = fopen(filename, "w");
+    FILE *fp = fopen(path, "w");
     if (!fp) {
-	fprintf(stderr, "%s: %s: open: %s\n", PNAME,
-		filename, strerror(errno));
+	fprintf(stderr, "%s: %s: open: %s\n", PNAME, path, strerror(errno));
 	return 1;
     }
     if (fputs(html, fp) < 0) {
-	fprintf(stderr, "%s: %s: write: %s\n", PNAME,
-		filename, strerror(errno));
+	fprintf(stderr, "%s: %s: write: %s\n", PNAME, path, strerror(errno));
 	fclose(fp);
 	return 1;
     }
     if (fclose(fp) < 0) {
-	fprintf(stderr, "%s: %s: fclose: %s\n", PNAME,
-		filename, strerror(errno));
+	fprintf(stderr, "%s: %s: fclose: %s\n", PNAME, path, strerror(errno));
 	return 1;
     }
+    sfree(path);
 
     /*
      * Recurse.
@@ -711,12 +1070,12 @@ int html_dump(const void *t, unsigned long index, unsigned long endindex,
     if (maxdepth != 0) {
 	unsigned long subindex, subendindex;
 	int newdepth = (maxdepth > 0 ? maxdepth - 1 : maxdepth);
-	char path[1+trie_maxpathlen(t)];
+	char rpath[1+trie_maxpathlen(t)];
 
 	index++;
 	while (index < endindex) {
-	    trie_getpath(t, index, path);
-	    get_indices(t, path, &subindex, &subendindex);
+	    trie_getpath(t, index, rpath);
+	    get_indices(t, rpath, &subindex, &subendindex);
 	    index = subendindex;
 	    if (subendindex - subindex > 1) {
 		if (html_dump(t, subindex, subendindex, newdepth,

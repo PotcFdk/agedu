@@ -1354,6 +1354,28 @@ int main(int argc, char **argv)
 	    maxpathlen = trie_maxpathlen(mappedfile);
 	    pathbuf = snewn(maxpathlen, char);
 
+	    if (!querydir || !gotdepth) {
+		/*
+		 * Single output file.
+		 */
+		if (!querydir) {
+                    cfg.uriformat = "/%|/%p/%|%|/%p";
+		} else {
+		    cfg.uriformat = NULL;
+		}
+		cfg.autoage = htmlautoagerange;
+		cfg.oldest = htmloldest;
+		cfg.newest = htmlnewest;
+		cfg.showfiles = showfiles;
+	    } else {
+                cfg.uriformat = "/index.html%|/%/p.html";
+                cfg.fileformat = "/index.html%|/%/p.html";
+		cfg.autoage = htmlautoagerange;
+		cfg.oldest = htmloldest;
+		cfg.newest = htmlnewest;
+		cfg.showfiles = showfiles;
+	    }
+
 	    if (!querydir) {
 		/*
 		 * If we're run in --cgi mode, read PATH_INFO to get
@@ -1364,13 +1386,27 @@ int main(int argc, char **argv)
 		if (!path_info)
 		    path_info = "";
 
+                /*
+                 * Parse the path.
+                 */
+                if (!html_parse_path(mappedfile, path_info, &cfg, &xi)) {
+		    printf("Status: 404\nContent-type: text/html\n\n"
+			   "<html><head>"
+			   "<title>404 Not Found</title>"
+			   "</head><body>"
+			   "<h1>400 Not Found</h1>"
+			   "<p>Invalid <code>agedu</code> pathname."
+			   "</body></html>\n");
+		    return 0;
+		}
+
 		/*
-		 * Because we need relative links to go to the
-		 * right place, it's important that our
-		 * PATH_INFO should contain a slash right at the
-		 * start, and no slashes anywhere else.
+		 * If the path was parseable but not canonically
+		 * expressed, return a redirect to the canonical
+		 * version.
 		 */
-		if (path_info[0] != '/') {
+                char *canonpath = html_format_path(mappedfile, &cfg, xi);
+		if (strcmp(canonpath, path_info)) {
 		    char *servername = getenv("SERVER_NAME");
 		    char *scriptname = getenv("SCRIPT_NAME");
 		    if (!servername || !scriptname) {
@@ -1392,7 +1428,7 @@ int main(int argc, char **argv)
 			return 0;
 		    }
 		    printf("Status: 301\n"
-			   "Location: http://%s/%s/\n"
+			   "Location: http://%s/%s%s\n"
 			   "Content-type: text/html\n\n"
 			   "<html><head>"
 			   "<title>301 Moved</title>"
@@ -1400,39 +1436,10 @@ int main(int argc, char **argv)
 			   "<h1>301 Moved</h1>"
 			   "<p>Moved."
 			   "</body></html>\n",
-			   servername, scriptname);
-		    return 0;
-		} else if (strchr(path_info+1, '/')) {
-		    printf("Status: 404\nContent-type: text/html\n\n"
-			   "<html><head>"
-			   "<title>404 Not Found</title>"
-			   "</head><body>"
-			   "<h1>400 Not Found</h1>"
-			   "<p>Invalid <code>agedu</code> pathname."
-			   "</body></html>\n");
+			   servername, scriptname, canonpath);
 		    return 0;
 		}
-		xi = atoi(path_info + 1);
 
-		if (xi >= trie_count(mappedfile)) {
-		    printf("Status: 404\nContent-type: text/html\n\n"
-			   "<html><head>"
-			   "<title>404 Not Found</title>"
-			   "</head><body>"
-			   "<h1>404 Not Found</h1>"
-			   "<p>This is not a valid pathname index."
-			   "</body></html>\n");
-		    return 0;
-		} else if (!index_has_root(mappedfile, xi)) {
-		    printf("Status: 404\nContent-type: text/html\n\n"
-			   "<html><head>"
-			   "<title>404 Not Found</title>"
-			   "</head><body>"
-			   "<h1>404 Not Found</h1>"
-			   "<p>Pathname index out of range."
-			   "</body></html>\n");
-		    return 0;
-		}
 	    } else {
 		/*
 		 * In ordinary --html mode, process a query
@@ -1468,16 +1475,6 @@ int main(int argc, char **argv)
 		/*
 		 * Single output file.
 		 */
-		if (!querydir) {
-		    cfg.format = "%.0lu";  /* use crosslinks in --cgi mode */
-		} else {
-		    cfg.format = NULL;
-		}
-		cfg.rootpage = NULL;
-		cfg.autoage = htmlautoagerange;
-		cfg.oldest = htmloldest;
-		cfg.newest = htmlnewest;
-		cfg.showfiles = showfiles;
 		html = html_query(mappedfile, xi, &cfg, 1);
 		if (querydir && outfile != NULL) {
 		    FILE *fp = fopen(outfile, "w");
@@ -1527,12 +1524,6 @@ int main(int argc, char **argv)
 		make_successor(pathbuf);
 		xi2 = trie_before(mappedfile, pathbuf);
 
-		cfg.format = "%lu.html";
-		cfg.rootpage = "index.html";
-		cfg.autoage = htmlautoagerange;
-		cfg.oldest = htmloldest;
-		cfg.newest = htmlnewest;
-		cfg.showfiles = showfiles;
 		if (html_dump(mappedfile, xi, xi2, depth, &cfg, prefix))
 		    return 1;
 	    }
@@ -1597,8 +1588,7 @@ int main(int argc, char **argv)
 	    dcfg.port = httpserverport;
 	    dcfg.closeoneof = closeoneof;
 	    dcfg.basicauthdata = httpauthdata;
-	    pcfg.format = NULL;
-	    pcfg.rootpage = NULL;
+	    pcfg.uriformat = "/%|/%p/%|%|/%p";
 	    pcfg.autoage = htmlautoagerange;
 	    pcfg.oldest = htmloldest;
 	    pcfg.newest = htmlnewest;

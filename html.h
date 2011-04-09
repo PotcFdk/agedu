@@ -4,21 +4,68 @@
 
 struct html_config {
     /*
-     * If "format" is non-NULL, it is treated as an sprintf format
-     * string which must contain exactly one %lu and no other
-     * formatting directives (other than %%, which doesn't count);
-     * this will be used to construct URLs to use in hrefs
-     * pointing to queries of other related (parent and child)
-     * pathnames.
+     * Configure the format of the URI pathname fragment corresponding
+     * to a given tree entry.
+     *
+     * 'uriformat' is expected to have the following format:
+     *  - it consists of one or more _options_, each indicating a
+     *    particular way to format a URI, separated by '%|'
+     *  - each option contains _at most one_ formatting directive;
+     *    without any, it is assumed to only be able to encode the
+     *    root tree entry
+     *  - the formatting directive may be followed before and/or
+     *    afterwards with literal text; percent signs in that literal
+     *    text are specified as %% (which doesn't count as a
+     *    formatting directive for the 'at most one' rule)
+     *  - formatting directives are as follows:
+     *     + '%n' outputs the numeric index (in decimal) of the tree
+     *       entry
+     *     + '%p' outputs the pathname of the tree entry, not counting
+     *       any common prefix of the whole tree or a subdirectory
+     *       separator following that (so that the root directory of
+     *       the tree will always be rendered as the empty string).
+     *       The subdirectory separator is translated into '/'; any
+     *       remotely worrying character is escaped as = followed by
+     *       two hex digits (including, in particular, = itself). The
+     *       only characters not escaped are the ASCII alphabets and
+     *       numbers, the subdirectory separator as mentioned above,
+     *       and the four punctuation characters -.@_ .
+     *     - '%/p' outputs the pathname of the tree entry, but this time
+     *       the subdirectory separator is also considered to be a
+     *       worrying character and is escaped.
+     *     - '%-p' and '%-/p' are like '%p' and '%/p' respectively,
+     *       except that they use the full pathname stored in the tree
+     *       without stripping a common prefix.
+     *
+     * These formats are used both for generating and parsing URI
+     * fragments. When generating, the first valid option is used
+     * (which is always the very first one if we're generating the
+     * root URI, or else it's the first option with any formatting
+     * directive); when parsing, the first option that matches will be
+     * accepted. (Thus, you can have '.../subdir' and '.../subdir/'
+     * both accepted, but make the latter canonical; clients of this
+     * mechanism will typically regenerate a URI string after parsing
+     * an index out of it, and return an HTTP redirect if it isn't in
+     * canonical form.)
+     *
+     * All hyperlinks should be correctly generated as relative (i.e.
+     * with the right number of ../ and ./ considering both the
+     * pathname for the page currently being generated, and the one
+     * for the link target).
+     *
+     * If 'uriformat' is NULL, the HTML is generated without hyperlinks.
      */
-    const char *format;
+    const char *uriformat;
 
     /*
-     * If "rootpage" is non-NULL, it overrides "format" to give a
-     * special name (e.g. "index.html") to the top-level page of the
-     * index.
+     * Configure the filenames output by html_dump(). These can be
+     * configured separately from the URI formats, so that the root
+     * file can be called index.html on disk but have a notional URI
+     * of just / or similar.
+     *
+     * Formatting directives are the same as the uriformat above.
      */
-    const char *rootpage;
+    const char *fileformat;
 
     /*
      * Time stamps to assign to the extreme ends of the colour
@@ -35,6 +82,22 @@ struct html_config {
      */
     int showfiles;
 };
+
+/*
+ * Parse a URI pathname segment against the URI formats specified in
+ * 'cfg', and return a numeric index in '*index'. Return value is true
+ * on success, or false if the pathname makes no sense, or the index
+ * is out of range, or the index does not correspond to a directory in
+ * the trie.
+ */
+int html_parse_path(const void *t, const char *path,
+                    const struct html_config *cfg, unsigned long *index);
+
+/*
+ * Generate a URI pathname segment from an index.
+ */
+char *html_format_path(const void *t, const struct html_config *cfg,
+                       unsigned long index);
 
 /*
  * Generate an HTML document containing the results of a query

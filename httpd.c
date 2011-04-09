@@ -268,22 +268,78 @@ char *got_data(struct connctx *ctx, char *data, int length,
 				 "This is a restricted-access set of pages.");
 	    }
 	} else {
-	    char *q;
 	    p = ctx->url;
-	    p += strspn(p, "/?");
-	    index = strtoul(p, &q, 10);
-	    if (*q) {
+	    if (!html_parse_path(ctx->t, p, cfg, &index)) {
 		ret = http_error("404", "Not Found", NULL,
-				 "This is not a valid pathname index.");
+				 "This is not a valid pathname.");
 	    } else {
-		document = html_query(ctx->t, index, cfg, 1);
-		if (document) {
-		    ret = http_success("text/html", 1, document);
-		    sfree(document);
-		} else {
-		    ret = http_error("404", "Not Found", NULL,
-				     "Pathname index out of range.");
-		}
+                char *canonpath = html_format_path(ctx->t, cfg, index);
+                if (!strcmp(canonpath, p)) {
+                    /*
+                     * This is a canonical path. Return the document.
+                     */
+                    document = html_query(ctx->t, index, cfg, 1);
+                    if (document) {
+                        ret = http_success("text/html", 1, document);
+                        sfree(document);
+                    } else {
+                        ret = http_error("404", "Not Found", NULL,
+                                         "This is not a valid pathname.");
+                    }
+                } else {
+                    /*
+                     * This is a non-canonical path. Return a redirect
+                     * to the right one.
+                     *
+                     * To do this, we must search the request headers
+                     * for Host:, to see what the client thought it
+                     * was calling our server.
+                     */
+
+                    char *host = NULL;
+                    q = ctx->data + ctx->datalen;
+                    for (p = ctx->headers; p < q; p++) {
+                        const char *hdr = "Host:";
+                        int i;
+                        for (i = 0; hdr[i]; i++) {
+                            if (p >= q || tolower((unsigned char)*p) !=
+                                tolower((unsigned char)hdr[i]))
+                                break;
+                            p++;
+                        }
+                        if (!hdr[i])
+                            break;     /* found our header */
+                        p = memchr(p, '\n', q - p);
+                        if (!p)
+                            p = q;
+                    }
+                    if (p < q) {
+                        while (p < q && isspace((unsigned char)*p))
+                            p++;
+                        r = p;
+                        while (p < q) {
+                            if (*p == '\r' && (p+1 >= q || p[1] == '\n'))
+                                break;
+                            p++;
+                        }
+                        host = snewn(p-r+1, char);
+                        memcpy(host, r, p-r);
+                        host[p-r] = '\0';
+                    }
+                    if (host) {
+                        char *header = dupfmt("Location: http://%s%s\r\n",
+                                              host, canonpath);
+                        ret = http_error("301", "Moved", header,
+                                         "This is not the canonical form of"
+                                         " this pathname.");
+                        sfree(header);
+                    } else {
+                        ret = http_error("400", "Bad Request", NULL,
+                                         "Needed a Host: header to return"
+                                         " the intended redirection.");
+                    }
+                }
+                sfree(canonpath);
 	    }
 	}
 	return ret;
@@ -416,8 +472,6 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
     struct sockaddr_in addr;
     socklen_t addrlen;
     struct html_config cfg = *incfg;
-
-    cfg.format = "%.0lu";
 
     /*
      * Establish the listening socket and retrieve its port

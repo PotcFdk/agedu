@@ -29,7 +29,9 @@ struct html_config {
      *       two hex digits (including, in particular, = itself). The
      *       only characters not escaped are the ASCII alphabets and
      *       numbers, the subdirectory separator as mentioned above,
-     *       and the four punctuation characters -.@_ .
+     *       and the four punctuation characters -.@_ (with the
+     *       exception that at the very start of a pathname, even '.'
+     *       is escaped).
      *     - '%/p' outputs the pathname of the tree entry, but this time
      *       the subdirectory separator is also considered to be a
      *       worrying character and is escaped.

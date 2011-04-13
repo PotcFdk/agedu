@@ -446,6 +446,7 @@ char *format_string(const char *fmt, unsigned long index, const void *t)
     char *path = NULL, *q = NULL;
     char pathsep = trie_pathsep(t);
     int maxpathlen = trie_maxpathlen(t);
+    int leading;
 
     while (fmt) {
         struct format_option opt = get_format_option(&fmt);
@@ -483,14 +484,20 @@ char *format_string(const char *fmt, unsigned long index, const void *t)
                 trie_getpath(t, index, path);
                 q = path;
             }
+            leading = 1;
             while (*q) {
                 char c = *q++;
-                if (c == pathsep && opt.translate_pathsep)
+                if (c == pathsep && opt.translate_pathsep) {
                     *p++ = '/';
-                else if (!isalnum((unsigned char)c) && !strchr("-.@_", c))
+                    leading = 1;
+                } else if (!isalnum((unsigned char)c) &&
+                           ((leading && c=='.') || !strchr("-.@_", c))) {
                     p += sprintf(p, "=%02X", (unsigned char)c);
-                else
+                    leading = 0;
+                } else {
                     *p++ = c;
+                    leading = 0;
+                }
             }
             sfree(path);
             break;
@@ -608,6 +615,29 @@ int html_parse_path(const void *t, const char *path,
                     p++;
                     midlen--;
                 } else if (*p == '=') {
+                    /*
+                     * We intentionally do not check whether the
+                     * escaped character _should_ have been escaped
+                     * according to the rules in html_format_path.
+                     *
+                     * All clients of this parsing function, after a
+                     * successful parse, call html_format_path to find
+                     * the canonical URI for the same index and return
+                     * an HTTP redirect if the provided URI was not
+                     * exactly equal to that canonical form. This is
+                     * critical when the correction involves adding or
+                     * removing a trailing slash (because then
+                     * relative hrefs on the generated page can be
+                     * computed with respect to the canonical URI
+                     * instead of having to remember what the actual
+                     * URI was), but also has the useful effect that
+                     * if a user attempts to type in (guess) a URI by
+                     * hand they don't have to remember the escaping
+                     * rules - as long as they type _something_ that
+                     * this code can parse into a recognisable
+                     * pathname, it will be automatically 301ed into
+                     * the canonical form.
+                     */
                     if (midlen < 3 ||
                         !isxdigit((unsigned char)p[1]) ||
                         !isxdigit((unsigned char)p[2]))

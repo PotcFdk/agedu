@@ -8,6 +8,40 @@ TODO list for agedu
    enable other modes of use like the built-in --cgi mode, without
    me having to anticipate them in detail.)
 
+ - non-ASCII character set support
+    + could usefully apply to --title and also to file names
+    + how do we determine the input charset? Via locale, presumably.
+    + how do we do translation? Importing my charset library is one
+      heavyweight option; alternatively, does the native C locale
+      mechanism provide enough functionality to do the job by itself?
+    + in HTML, we would need to decide on an _output_ character set,
+      specify it in a <meta http-equiv> tag, and translate to it from
+      the input locale
+       - one option is to make the output charset the same as the
+         input one, in which case all we need is to identify its name
+         for the <meta> tag
+       - the other option is to make the output charset UTF-8 always
+         and translate to that from everything else
+       - in the web server and CGI modes, it would probably be nicer
+         to move that <meta> tag into a proper HTTP header
+    + even in text mode we would want to parse the filenames in some
+      fashion, due to the unhelpful corner case of Shift-JIS Windows
+      (in which backslashes in the input string must be classified as
+      path separators or the second byte of a two-byte character)
+       - that's really painful, since it will impact string processing
+         of filenames throughout the code
+       - so perhaps a better approach would be to do locale processing
+         of filenames at _scan_ time, and normalise to UTF-8 in both
+         the index and dump files?
+          + involves incrementing the version of the dump-file format
+          + then paths given on the command line are translated
+            quickly to UTF-8 before comparing them against index paths
+          + and now the HTML output side becomes easy, though the text
+            output involves translating back again
+          + but what if the filenames aren't intended to be
+            interpreted in any particular character set (old-style
+            Unix semantics) or in a consistent one?
+
  - we could still be using more of the information coming from
    autoconf. Our config.h is defining a whole bunch of HAVE_FOOs for
    particular functions (e.g. HAVE_INET_NTOA, HAVE_MEMCHR,

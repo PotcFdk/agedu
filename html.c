@@ -869,7 +869,10 @@ char *html_query(const void *t, unsigned long index,
 
     path = snewn(1+trie_maxpathlen(t), char);
     ctx->path2 = path2 = snewn(1+trie_maxpathlen(t), char);
-    ctx->oururi = format_string(cfg->uriformat, index, t);
+    if (cfg->uriformat)
+        ctx->oururi = format_string(cfg->uriformat, index, t);
+    else
+        ctx->oururi = NULL;
 
     /*
      * HEAD section.

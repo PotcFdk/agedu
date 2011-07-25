@@ -653,7 +653,7 @@ newline, or else it will be considered part of the password).
 
 \dt \cw{--title} \e{title}
 
-\dd Specify the string that appears at the start of the <title>
+\dd Specify the string that appears at the start of the \cw{<title>}
 section of the output HTML pages. The default is \cq{agedu}. This
 title is followed by a colon and then the path you're viewing within
 the index file. You might use this option if you were serving

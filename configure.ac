@@ -10,6 +10,8 @@ AM_INIT_AUTOMAKE
 AC_PROG_CC
 AC_PROG_CC_C99
 AC_PROG_INSTALL
+AC_CHECK_PROG([HALIBUT],[halibut],[yes],[no])
+AM_CONDITIONAL([HAVE_HALIBUT],[test "x$HALIBUT" = "xyes"])
 
 # Checks for libraries.
 

@@ -361,6 +361,8 @@ static void text_query(const void *mappedfile, const char *querydir,
         HELPARG("filename") HELPOPT("[--web] read HTTP Basic user/pass from file") \
     VAL(AUTHFD) LONG(auth_fd) \
         HELPARG("fd") HELPOPT("[--web] read HTTP Basic user/pass from fd") \
+    VAL(HTMLTITLE) LONG(title) \
+        HELPARG("title") HELPOPT("[--web,--html] title prefix for web pages") \
     VAL(DEPTH) SHORT(d) LONG(depth) LONG(max_depth) LONG(maximum_depth) \
         HELPARG("levels") HELPOPT("[--text,--html] recurse to this many levels") \
     VAL(MINAGE) SHORT(a) LONG(age) LONG(min_age) LONG(minimum_age) \
@@ -504,6 +506,7 @@ int main(int argc, char **argv)
     int httpserverport = 0;
     const char *httpauthdata = NULL;
     const char *outfile = NULL;
+    const char *html_title = PNAME;
     int auth = HTTPD_AUTH_MAGIC | HTTPD_AUTH_BASIC;
     int progress = 1;
     struct inclusion_exclusion *inex = NULL;
@@ -791,6 +794,9 @@ int main(int argc, char **argv)
 		  case OPT_OUTFILE:
 		    outfile = optval;
 		    break;
+                  case OPT_HTMLTITLE:
+                    html_title = optval;
+                    break;
 		  case OPT_MINAGE:
 		    textcutoff = parse_age(now, optval);
 		    break;
@@ -1375,6 +1381,7 @@ int main(int argc, char **argv)
 		cfg.newest = htmlnewest;
 		cfg.showfiles = showfiles;
 	    }
+            cfg.html_title = html_title;
 
 	    if (!querydir) {
 		/*
@@ -1593,6 +1600,7 @@ int main(int argc, char **argv)
 	    pcfg.oldest = htmloldest;
 	    pcfg.newest = htmlnewest;
 	    pcfg.showfiles = showfiles;
+            pcfg.html_title = html_title;
 	    run_httpd(mappedfile, auth, &dcfg, &pcfg);
 	    munmap(mappedfile, totalsize);
 	} else if (mode == REMOVE) {

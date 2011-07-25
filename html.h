@@ -83,6 +83,11 @@ struct html_config {
      * directories in the report.
      */
     int showfiles;
+    /*
+     * The string appearing in the <title> part of HTML pages, before
+     * a colon followed by the path being served. Default is "agedu".
+     */
+    const char *html_title;
 };
 
 /*

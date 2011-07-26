@@ -4,7 +4,7 @@ AC_INIT([agedu], [6.66], [anakin@pobox.com])
 AC_CONFIG_SRCDIR([agedu.c])
 AC_CONFIG_HEADER([config.h])
 
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE(foreign)
 
 # Checks for programs.
 AC_PROG_CC

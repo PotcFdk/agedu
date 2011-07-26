@@ -7,7 +7,6 @@ module agedu
 in agedu do sed '/AC_INIT/s/6.66/r$(revision)/' configure.ac > tmp.ac
 in agedu do mv tmp.ac configure.ac
 in agedu do ./mkauto.sh
-in agedu do rm -rf autom4te.cache
 
 # Build the man page. This also tests the automake setup to ensure
 # configure actually works; but we use a self-delegation (i.e. do all

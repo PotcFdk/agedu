@@ -1,2 +1,2 @@
 #!/bin/sh
-aclocal && autoconf && autoheader && automake -a --foreign
+autoreconf -i && rm -rf autom4te.cache

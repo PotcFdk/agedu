@@ -1143,7 +1143,6 @@ int main(int argc, char **argv)
 		prevbuf[0] = '\0';
 		tf = triewalk_next(tw, buf);
 		assert(tf);
-		prevtf = NULL;	       /* placate lint */
 		while (1) {
 		    int i;
 
@@ -1178,9 +1177,6 @@ int main(int argc, char **argv)
 			triewalk_rebase(tw, mappedfile);
 			diff = (const unsigned char *)mappedfile -
 			    (const unsigned char *)oldfile;
-			if (prevtf)
-			    prevtf = (const struct trie_file *)
-				(((const unsigned char *)prevtf) + diff);
 			if (tf)
 			    tf = (const struct trie_file *)
 				(((const unsigned char *)tf) + diff);

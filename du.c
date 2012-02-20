@@ -255,9 +255,18 @@ void du(const char *inpath, gotdata_fn_t gotdata, err_fn_t err,
     size_t pathlen, pathsize;
 
     pathlen = strlen(inpath);
+
+    /*
+     * Trim any trailing slashes from the input path, otherwise we'll
+     * store them in the index with confusing effects.
+     */
+    while (pathlen > 1 && inpath[pathlen-1] == '/')
+        pathlen--;
+
     pathsize = pathlen + 256;
     path = snewn(pathsize, char);
-    strcpy(path, inpath);
+    memcpy(path, inpath, pathlen);
+    path[pathlen] = '\0';
 
     du_recurse(&path, pathlen, &pathsize, gotdata, err, gotdata_ctx, 1);
 }

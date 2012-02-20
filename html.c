@@ -959,10 +959,10 @@ char *html_query(const void *t, unsigned long index,
 	char buf[80];
 
 	if (i == 0) {
-	    strcpy(buf, "&lt; ");
+	    strcpy(buf, "&gt; ");
 	    round_and_format_age(ctx, ctx->thresholds[0], buf+5, 0);
 	} else if (i == MAXCOLOUR) {
-	    strcpy(buf, "&gt; ");
+	    strcpy(buf, "&lt; ");
 	    round_and_format_age(ctx, ctx->thresholds[MAXCOLOUR-1], buf+5, 0);
 	} else {
 	    unsigned long long midrange =

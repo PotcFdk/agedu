@@ -439,14 +439,15 @@ struct format_option get_format_option(const char **fmt)
     }
 }
 
-char *format_string(const char *fmt, unsigned long index, const void *t)
+char *format_string_inner(const char *fmt, int nescape,
+                          unsigned long index, const void *t)
 {
     int maxlen;
     char *ret = NULL, *p = NULL;
     char *path = NULL, *q = NULL;
     char pathsep = trie_pathsep(t);
     int maxpathlen = trie_maxpathlen(t);
-    int leading;
+    int charindex;
 
     while (fmt) {
         struct format_option opt = get_format_option(&fmt);
@@ -484,19 +485,21 @@ char *format_string(const char *fmt, unsigned long index, const void *t)
                 trie_getpath(t, index, path);
                 q = path;
             }
-            leading = 1;
+            charindex = 0;
             while (*q) {
                 char c = *q++;
                 if (c == pathsep && opt.translate_pathsep) {
                     *p++ = '/';
-                    leading = 1;
-                } else if (!isalnum((unsigned char)c) &&
-                           ((leading && c=='.') || !strchr("-.@_", c))) {
+                    charindex = 0;
+                } else if (charindex < nescape ||
+                           (!isalnum((unsigned char)c) &&
+                            ((charindex == 0 && c=='.') ||
+                             !strchr("-.@_", c)))) {
                     p += sprintf(p, "=%02X", (unsigned char)c);
-                    leading = 0;
+                    charindex++;
                 } else {
                     *p++ = c;
-                    leading = 0;
+                    charindex++;
                 }
             }
             sfree(path);
@@ -513,21 +516,14 @@ char *format_string(const char *fmt, unsigned long index, const void *t)
     assert(!"Getting here implies an incomplete set of formats");
 }
 
-char *html_format_path(const void *t, const struct html_config *cfg,
-                       unsigned long index)
-{
-    return format_string(cfg->uriformat, index, t);
-}
-
-int html_parse_path(const void *t, const char *path,
-                    const struct html_config *cfg, unsigned long *index)
+int parse_path(const void *t, const char *path,
+               const char *fmt, unsigned long *index)
 {
     int len = strlen(path);
     int midlen;
     const char *p, *q;
     char *r;
     char pathsep = trie_pathsep(t);
-    const char *fmt = cfg->uriformat;
 
     while (fmt) {
         struct format_option opt = get_format_option(&fmt);
@@ -681,6 +677,66 @@ int html_parse_path(const void *t, const char *path,
     }
 
     return 0;                    /* no match from any format option */
+}
+
+char *format_string(const char *fmt, unsigned long index, const void *t)
+{
+    unsigned long indexout, parseret;
+    char *ret;
+    const char *stepfmt = fmt;
+    int nescape = 0;
+
+    /*
+     * Format the string using whichever format option first works.
+     */
+    ret = format_string_inner(fmt, 0, index, t);
+
+    /*
+     * Now re-_parse_ the string, to see if it gives the same index
+     * back. It might not, if a pathname is valid in two formats: for
+     * instance, if you use '-H -d max' to generate a static HTML dump
+     * from scanning a directory which has a subdir called 'index',
+     * you might well find that the top-level file wants to be called
+     * index.html and so does the one for that subdir.
+     *
+     * We fix this by formatting the string again with more and more
+     * characters escaped, so that the non-root 'index.html' becomes
+     * (e.g.) '=69ndex.html', or '=69=6edex.html' if that doesn't
+     * work, etc.
+     */
+    while (1) {
+        struct format_option opt = get_format_option(&stepfmt);
+
+        /*
+         * Parse the pathname and see if it gives the right index.
+         */
+        int parseret = parse_path(t, ret, fmt, &indexout);
+        assert(parseret != 0);
+        if (indexout == index)
+            break;                     /* path now parses successfully */
+
+        /*
+         * If not, try formatting it again.
+         */
+        char *new = format_string_inner(fmt, ++nescape, index, t);
+        assert(strcmp(new, ret));      /* if nescape gets too big, give up */
+        sfree(ret);
+        ret = new;
+    }
+
+    return ret;
+}
+
+char *html_format_path(const void *t, const struct html_config *cfg,
+                       unsigned long index)
+{
+    return format_string(cfg->uriformat, index, t);
+}
+
+int html_parse_path(const void *t, const char *path,
+                    const struct html_config *cfg, unsigned long *index)
+{
+    return parse_path(t, path, cfg->uriformat, index);
 }
 
 char *make_href(const char *source, const char *target)

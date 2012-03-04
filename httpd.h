@@ -8,8 +8,7 @@
 #define HTTPD_AUTH_NONE  4
 
 struct httpd_config {
-    const char *address;
-    int port;
+    const char *address, *port;
     int closeoneof;
     const char *basicauthdata;
 };

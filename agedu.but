@@ -578,12 +578,11 @@ three months ago or later.
 
 \dt \cw{--address} \e{addr}[\cw{:}\e{port}]
 
-\dd Specifies the network address and port number on which
-\cw{agedu} should listen when running its web server. If you want
-\cw{agedu} to listen for connections coming in from any source, you
-should probably specify the special IP address \cw{0.0.0.0}. If the
-port number is omitted, an arbitrary unused port will be chosen for
-you and displayed.
+\dd Specifies the network address and port number on which \cw{agedu}
+should listen when running its web server. If you want \cw{agedu} to
+listen for connections coming in from any source, specify the address
+as the special value \cw{ANY}. If the port number is omitted, an
+arbitrary unused port will be chosen for you and displayed.
 
 \lcont{
 

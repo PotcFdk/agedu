@@ -55,11 +55,6 @@ TODO list for agedu
       controversial; IIRC it's all in POSIX, for one thing. So more
       likely this should simply wait until somebody complains.
 
- - IPv6 support in the HTTP server
-    * of course, Linux magic auth can still work in this context; we
-      merely have to be prepared to open one of /proc/net/tcp or
-      /proc/net/tcp6 as appropriate.
-
  - run-time configuration in the HTTP server
     * I think this probably works by having a configuration form, or
       a link pointing to one, somewhere on the report page. If you

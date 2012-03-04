@@ -502,8 +502,8 @@ int main(int argc, char **argv)
     time_t now = time(NULL);
     time_t textcutoff = now, htmlnewest = now, htmloldest = now;
     int htmlautoagerange = 1;
-    const char *httpserveraddr = NULL;
-    int httpserverport = 0;
+    const char *httpserveraddr = "localhost";
+    const char *httpserverport = NULL;
     const char *httpauthdata = NULL;
     const char *outfile = NULL;
     const char *html_title = PNAME;
@@ -821,10 +821,13 @@ int main(int argc, char **argv)
 			else
 			    port = optval;
 			port += strcspn(port, ":");
-			if (port)
+			if (port && *port)
 			    *port++ = '\0';
-			httpserveraddr = optval;
-			httpserverport = atoi(port);
+                        if (!strcmp(optval, "ANY"))
+                            httpserveraddr = NULL;
+                        else
+                            httpserveraddr = optval;
+			httpserverport = port;
 		    }
 		    break;
 		  case OPT_AUTH:

@@ -388,9 +388,12 @@ struct fd *new_fdstruct(int fd, int type)
 
 int check_owning_uid(int fd, int flip)
 {
-    struct sockaddr_in sock, peer;
+    struct sockaddr_storage sock, peer;
+    int connected;
     socklen_t addrlen;
-    char linebuf[4096], matchbuf[80];
+    char linebuf[4096], matchbuf[128];
+    char *filename;
+    int matchcol, uidcol;
     FILE *fp;
 
     addrlen = sizeof(sock);
@@ -399,10 +402,12 @@ int check_owning_uid(int fd, int flip)
 	exit(1);
     }
     addrlen = sizeof(peer);
+    connected = 1;
     if (getpeername(fd, (struct sockaddr *)&peer, &addrlen)) {
 	if (errno == ENOTCONN) {
-	    peer.sin_addr.s_addr = htonl(0);
-	    peer.sin_port = htons(0);
+            connected = 0;
+            memset(&peer, 0, sizeof(peer));
+            peer.ss_family = sock.ss_family;
 	} else {
 	    fprintf(stderr, "getpeername: %s\n", strerror(errno));
 	    exit(1);
@@ -410,21 +415,60 @@ int check_owning_uid(int fd, int flip)
     }
 
     if (flip) {
-	struct sockaddr_in tmp = sock;
+	struct sockaddr_storage tmp = sock;
 	sock = peer;
 	peer = tmp;
     }
 
-    sprintf(matchbuf, "%08X:%04X %08X:%04X",
-	    peer.sin_addr.s_addr, ntohs(peer.sin_port),
-	    sock.sin_addr.s_addr, ntohs(sock.sin_port));
-    fp = fopen("/proc/net/tcp", "r");
+#ifndef NO_IPV4
+    if (peer.ss_family == AF_INET) {
+        struct sockaddr_in *sock4 = (struct sockaddr_in *)&sock;
+        struct sockaddr_in *peer4 = (struct sockaddr_in *)&peer;
+
+        assert(peer4->sin_family == AF_INET);
+
+        sprintf(matchbuf, "%08X:%04X %08X:%04X",
+                peer4->sin_addr.s_addr, ntohs(peer4->sin_port),
+                sock4->sin_addr.s_addr, ntohs(sock4->sin_port));
+        filename = "/proc/net/tcp";
+        matchcol = 6;
+        uidcol = 75;
+    } else
+#endif
+#ifndef NO_IPV6
+    if (peer.ss_family == AF_INET6) {
+        struct sockaddr_in6 *sock6 = (struct sockaddr_in6 *)&sock;
+        struct sockaddr_in6 *peer6 = (struct sockaddr_in6 *)&peer;
+        char *p;
+
+        assert(peer6->sin6_family == AF_INET6);
+
+        p = matchbuf;
+        for (int i = 0; i < 4; i++)
+            p += sprintf(p, "%08X",
+                         ((uint32_t *)peer6->sin6_addr.s6_addr)[i]);
+        p += sprintf(p, ":%04X ", ntohs(peer6->sin6_port));
+        for (int i = 0; i < 4; i++)
+            p += sprintf(p, "%08X",
+                         ((uint32_t *)sock6->sin6_addr.s6_addr)[i]);
+        p += sprintf(p, ":%04X", ntohs(sock6->sin6_port));
+
+        filename = "/proc/net/tcp6";
+        matchcol = 6;
+        uidcol = 123;
+    } else
+#endif
+    {
+        return -1;                     /* unidentified family */
+    }
+
+    fp = fopen(filename, "r");
     if (fp) {
 	while (fgets(linebuf, sizeof(linebuf), fp)) {
-	    if (strlen(linebuf) >= 75 &&
-		!strncmp(linebuf+6, matchbuf, strlen(matchbuf))) {
+	    if (strlen(linebuf) >= uidcol &&
+		!strncmp(linebuf+matchcol, matchbuf, strlen(matchbuf))) {
 		fclose(fp);
-		return atoi(linebuf + 75);
+		return atoi(linebuf + uidcol);
 	    }
 	}
 	fclose(fp);
@@ -463,73 +507,264 @@ static void base64_encode_atom(unsigned char *data, int n, char *out)
 	out[3] = '=';
 }
 
+struct listenfds {
+    int v4, v6;
+};
+
+static int make_listening_sockets(struct listenfds *fds, const char *address,
+                                  const char *portstr, char **outhostname)
+{
+    /*
+     * Establish up to 2 listening sockets, for IPv4 and IPv6, on the
+     * same arbitrarily selected port. Return them in fds.v4 and
+     * fds.v6, with each entry being -1 if that socket was not
+     * established at all. Main return value is the port chosen, or <0
+     * if the whole process failed.
+     */
+    struct sockaddr_in6 addr6;
+    struct sockaddr_in addr4;
+    int got_v6, got_v4;
+    socklen_t addrlen;
+    int ret, port = 0;
+
+    /*
+     * Special case of the address parameter: if it's "0.0.0.0", treat
+     * it like NULL, because that was how you specified listen-on-any-
+     * address in versions before the IPv6 revamp.
+     */
+    {
+        int u,v,w,x;
+        if (address && 
+            4 == sscanf(address, "%d.%d.%d.%d", &u, &v, &w, &x) &&
+            u==0 && v==0 && w==0 && x==0)
+            address = NULL;
+    }
+
+    if (portstr && !*portstr)
+        portstr = NULL;                /* normalise NULL and empty string */
+
+    if (!address) {
+        char hostname[HOST_NAME_MAX];
+        if (gethostname(hostname, sizeof(hostname)) < 0) {
+            perror("hostname");
+            return -1;
+        }
+        *outhostname = dupstr(hostname);
+    } else {
+        *outhostname = dupstr(address);
+    }
+
+    fds->v6 = fds->v4 = -1;
+    got_v6 = got_v4 = 0;
+
+#if defined HAVE_GETADDRINFO
+
+    /*
+     * Resolve the given address using getaddrinfo, yielding an IPv6
+     * address or an IPv4 one or both.
+     */
+
+    struct addrinfo hints;
+    struct addrinfo *addrs, *ai;
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = 0;
+    hints.ai_flags = AI_PASSIVE;
+    ret = getaddrinfo(address, portstr ? portstr : "http", &hints, &addrs);
+    if (ret) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(ret));
+        return -1;
+    }
+    for (ai = addrs; ai; ai = ai->ai_next) {
+#ifndef NO_IPV6
+        if (!got_v6 && ai->ai_family == AF_INET6) {
+            memcpy(&addr6, ai->ai_addr, ai->ai_addrlen);
+            if (portstr && !port)
+                port = ntohs(addr6.sin6_port);
+            got_v6 = 1;
+        }
+#endif
+#ifndef NO_IPV4
+        if (!got_v4 && ai->ai_family == AF_INET) {
+            memcpy(&addr4, ai->ai_addr, ai->ai_addrlen);
+            if (portstr && !port)
+                port = ntohs(addr4.sin_port);
+            got_v4 = 1;
+        }
+#endif
+    }
+
+#elif defined HAVE_GETHOSTBYNAME
+
+    /*
+     * IPv4-only setup using inet_addr and gethostbyname.
+     */
+    struct hostent *h;
+
+    memset(&addr4, 0, sizeof(addr4));
+    addr4.sin_family = AF_INET;
+
+    if (!address) {
+        addr4.sin_addr.s_addr = htons(INADDR_ANY);
+        got_v4 = 1;
+    } else if (inet_aton(address, &addr4.sin_addr)) {
+        got_v4 = 1;                    /* numeric address */
+    } else if ((h = gethostbyname(address)) != NULL) {
+        memcpy(&addr4.sin_addr, h->h_addr, sizeof(addr4.sin_addr));
+        got_v4 = 1;
+    } else {
+        fprintf(stderr, "gethostbyname: %s\n", hstrerror(h_errno));
+        return -1;
+    }
+
+    if (portstr) {
+        struct servent *s;
+        if (!portstr[strspn(portstr, "0123456789")]) {
+            port = atoi(portstr);
+        } else if ((s = getservbyname(portstr, NULL)) != NULL) {
+            port = ntohs(s->s_port);
+        } else {
+            fprintf(stderr, "getservbyname: port '%s' not understood\n",
+                    portstr);
+            return -1;
+        }
+    }
+
+#endif
+
+#ifndef NO_IPV6
+#ifndef NO_IPV4
+  retry:
+#endif
+    if (got_v6) {
+        fds->v6 = socket(PF_INET6, SOCK_STREAM, 0);
+        if (fds->v6 < 0) {
+            fprintf(stderr, "socket(PF_INET6): %s\n", strerror(errno));
+            goto done_v6;
+        }
+#ifdef IPV6_V6ONLY
+        {
+            int i = 1;
+            if (setsockopt(fds->v6, IPPROTO_IPV6, IPV6_V6ONLY,
+                           (char *)&i, sizeof(i)) < 0) {
+                fprintf(stderr, "setsockopt(IPV6_V6ONLY): %s\n",
+                        strerror(errno));
+                close(fds->v6);
+                fds->v6 = -1;
+                goto done_v6;
+            }
+        }
+#endif /* IPV6_V6ONLY */
+        addr6.sin6_port = htons(port);
+        addrlen = sizeof(addr6);
+        if (bind(fds->v6, (const struct sockaddr *)&addr6, addrlen) < 0) {
+            fprintf(stderr, "bind: %s\n", strerror(errno));
+            close(fds->v6);
+            fds->v6 = -1;
+            goto done_v6;
+        }
+        if (listen(fds->v6, 5) < 0) {
+            fprintf(stderr, "listen: %s\n", strerror(errno));
+            close(fds->v6);
+            fds->v6 = -1;
+            goto done_v6;
+        }
+        if (port == 0) {
+            addrlen = sizeof(addr6);
+            if (getsockname(fds->v6, (struct sockaddr *)&addr6,
+                            &addrlen) < 0) {
+                fprintf(stderr, "getsockname: %s\n", strerror(errno));
+                close(fds->v6);
+                fds->v6 = -1;
+                goto done_v6;
+            }
+            port = ntohs(addr6.sin6_port);
+        }
+    }
+  done_v6:
+#endif
+
+#ifndef NO_IPV4
+    if (got_v4) {
+        fds->v4 = socket(PF_INET, SOCK_STREAM, 0);
+        if (fds->v4 < 0) {
+            fprintf(stderr, "socket(PF_INET): %s\n", strerror(errno));
+            goto done_v4;
+        }
+        addr4.sin_port = htons(port);
+        addrlen = sizeof(addr4);
+        if (bind(fds->v4, (const struct sockaddr *)&addr4, addrlen) < 0) {
+#ifndef NO_IPV6
+            if (fds->v6 >= 0) {
+                /*
+                 * If we support both v6 and v4, it's a failure
+                 * condition if we didn't manage to bind to both. If
+                 * the port number was arbitrary, we go round and try
+                 * again. Otherwise, give up.
+                 */
+                close(fds->v6);
+                close(fds->v4);
+                fds->v6 = fds->v4 = -1;
+                port = 0;
+                if (!portstr)
+                    goto retry;
+            }
+#endif
+            fprintf(stderr, "bind: %s\n", strerror(errno));
+            close(fds->v4);
+            fds->v4 = -1;
+            goto done_v4;
+        }
+        if (listen(fds->v4, 5) < 0) {
+            fprintf(stderr, "listen: %s\n", strerror(errno));
+            close(fds->v4);
+            fds->v4 = -1;
+            goto done_v4;
+        }
+        if (port == 0) {
+            addrlen = sizeof(addr4);
+            if (getsockname(fds->v4, (struct sockaddr *)&addr4,
+                            &addrlen) < 0) {
+                fprintf(stderr, "getsockname: %s\n", strerror(errno));
+                close(fds->v4);
+                fds->v4 = -1;
+                goto done_v4;
+            }
+            port = ntohs(addr4.sin_port);
+        }
+    }
+  done_v4:
+#endif
+
+    if (fds->v6 >= 0 || fds->v4 >= 0)
+        return port;
+    else
+        return -1;
+}
+
 void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
 	       const struct html_config *incfg)
 {
-    int fd, ret;
+    struct listenfds lfds;
+    int ret, port;
     int authtype;
     char *authstring = NULL;
+    char *hostname;
     struct sockaddr_in addr;
     socklen_t addrlen;
     struct html_config cfg = *incfg;
 
     /*
-     * Establish the listening socket and retrieve its port
+     * Establish the listening socket(s) and retrieve its port
      * number.
      */
-    fd = socket(PF_INET, SOCK_STREAM, 0);
-    if (fd < 0) {
-	fprintf(stderr, "socket(PF_INET): %s\n", strerror(errno));
-	exit(1);
-    }
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    if (!dcfg->address) {
-#ifdef RANDOM_LOCALHOST
-	unsigned long ipaddr;
-	srand(0L);
-	ipaddr = 0x7f000000;
-	ipaddr += (1 + rand() % 255) << 16;
-	ipaddr += (1 + rand() % 255) << 8;
-	ipaddr += (1 + rand() % 255);
-	addr.sin_addr.s_addr = htonl(ipaddr);
-#else
-	addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-#endif
-	addr.sin_port = htons(0);
-    } else {
-	addr.sin_addr.s_addr = inet_addr(dcfg->address);
-	addr.sin_port = dcfg->port ? htons(dcfg->port) : 0;
-    }
-    addrlen = sizeof(addr);
-    ret = bind(fd, (const struct sockaddr *)&addr, addrlen);
-#ifdef RANDOM_LOCALHOST
-    if (ret < 0 && errno == EADDRNOTAVAIL && !dcfg->address) {
-	/*
-	 * Some systems don't like us binding to random weird
-	 * localhost-space addresses. Try again with the official
-	 * INADDR_LOOPBACK.
-	 */
-	addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-	addr.sin_port = htons(0);
-	ret = bind(fd, (const struct sockaddr *)&addr, addrlen);
-    }
-#endif
-    if (ret < 0) {
-	fprintf(stderr, "bind: %s\n", strerror(errno));
-	exit(1);
-    }
-    if (listen(fd, 5) < 0) {
-	fprintf(stderr, "listen: %s\n", strerror(errno));
-	exit(1);
-    }
-    addrlen = sizeof(addr);
-    if (getsockname(fd, (struct sockaddr *)&addr, &addrlen)) {
-	fprintf(stderr, "getsockname: %s\n", strerror(errno));
-	exit(1);
-    }
+    port = make_listening_sockets(&lfds, dcfg->address, dcfg->port, &hostname);
+    if (port < 0)
+        exit(1);                       /* already reported an error */
+
     if ((authmask & HTTPD_AUTH_MAGIC) &&
-	(check_owning_uid(fd, 1) == getuid())) {
+	(lfds.v4 < 0 || check_owning_uid(lfds.v4, 1) == getuid()) &&
+        (lfds.v6 < 0 || check_owning_uid(lfds.v6, 1) == getuid())) {
 	authtype = HTTPD_AUTH_MAGIC;
 	if (authmask != HTTPD_AUTH_MAGIC)
 	    printf("Using Linux /proc/net magic authentication\n");
@@ -615,20 +850,20 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
 	fprintf(stderr, PNAME ": authentication method not supported\n");
 	exit(1);
     }
-    if (ntohs(addr.sin_addr.s_addr) == INADDR_ANY) {
-	printf("Server port: %d\n", ntohs(addr.sin_port));
-    } else if (ntohs(addr.sin_port) == 80) {
-	printf("URL: http://%s/\n", inet_ntoa(addr.sin_addr));
+    if (port == 80) {
+	printf("URL: http://%s/\n", hostname);
     } else {
-	printf("URL: http://%s:%d/\n",
-	       inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+	printf("URL: http://%s:%d/\n", hostname, port);
     }
     fflush(stdout);
 
     /*
-     * Now construct an fd structure to hold it.
+     * Now construct fd structure(s) to hold the listening sockets.
      */
-    new_fdstruct(fd, FD_LISTENER);
+    if (lfds.v4 >= 0)
+        new_fdstruct(lfds.v4, FD_LISTENER);
+    if (lfds.v6 >= 0)
+        new_fdstruct(lfds.v6, FD_LISTENER);
 
     if (dcfg->closeoneof) {
         /*

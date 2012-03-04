@@ -88,6 +88,9 @@
 #ifdef HAVE_SYS_SELECT_H
 #  include <sys/select.h>
 #endif
+#ifdef HAVE_NETDB_H
+#  include <netdb.h>
+#endif
     
 #define PNAME "agedu"
 

@@ -98,7 +98,7 @@ TODO list for agedu
       but would certainly be strange and confusing to others.
 
  - it might conceivably be useful to support a choice of indexing
-   strategies. The current "continuous index" mechanism' tradeoff of
+   strategies. The current "continuous index" mechanism's tradeoff of
    taking O(N log N) space in order to be able to support any age
    cutoff you like is not going to be ideal for everybody. A second
    more conventional "discrete index" mechanism which allows the

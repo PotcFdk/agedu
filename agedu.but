@@ -696,7 +696,18 @@ bothers re-reading it if it has; programs which do this include
 \cw{rsync}(\e{1}) and \cw{make}(\e{1}). Such programs will fail to
 update the atime of unmodified files despite depending on their
 continued existence; a directory full of such files will be reported
-as disused by \cw{agedu} but deleting them will cause trouble.
+as disused by \cw{agedu} even in situations where deleting them will
+cause trouble.
+
+Finally, of course, \cw{agedu}'s normal usage mode depends critically
+on the OS providing last-access times which are at least approximately
+right. So a file system mounted with Linux's \cq{noatime} option, or
+the equivalent on any other OS, will not give useful results!
+(However, the Linux mount option \cq{relatime}, which distributions
+now tend to use by default, should be fine for all but specialist
+purposes: it reduces the accuracy of last-access times so that they
+might be wrong by up to 24 hours, but if you're looking for files that
+have been unused for months or years, that's not a problem.)
 
 \U LICENCE
 

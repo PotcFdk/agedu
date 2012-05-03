@@ -1246,7 +1246,8 @@ int main(int argc, char **argv)
 		indexbuild_free(ib);
 
 		munmap(mappedfile, totalsize);
-		ftruncate(fd, realsize);
+		if (ftruncate(fd, realsize) < 0)
+                    fatal("%s: truncate: %s\n", filename, strerror(errno));
 		close(fd);
 		printf("Final index file size = %llu bytes\n",
 		       (unsigned long long)realsize);

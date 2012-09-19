@@ -290,6 +290,16 @@ CGI scripts is assumed to be the job of the web server.
 
 }
 
+\dt \cw{-h} or \cw{--help}
+
+\dd Causes \cw{agedu} to print some help text and terminate
+immediately.
+
+\dt \cw{-V} or \cw{--version}
+
+\dd Causes \cw{agedu} to print its version number and terminate
+immediately.
+
 \U OPTIONS
 
 This section describes the various configuration options that affect
@@ -508,6 +518,17 @@ the web server mode \cw{-w}, the stand-alone HTML generation mode
 files in each directory, instead of just giving a combined report
 for everything that's not in a subdirectory.
 
+The following option affects the text report mode \cw{-t}.
+
+\dt \cw{-a} \e{age} or \cw{--age} \e{age}
+
+\dd This option tells \cw{agedu} to report only files of at least the
+specified age. An age is specified as a number, followed by one of
+\cq{y} (years), \cq{m} (months), \cq{w} (weeks) or \cq{d} (days).
+(This syntax is also used by the \cw{-r} option.) For example, \cw{-a
+6m} will produce a text report which includes only files at least six
+months old.
+
 The following options affect the stand-alone HTML generation mode
 \cw{-H} and the text report mode \cw{-t}.
 
@@ -562,11 +583,11 @@ limits, and you can do this using \cw{-r}.
 The argument to \cw{-r} consists of a single age, or two ages
 separated by a minus sign. An age is a number, followed by one of
 \cq{y} (years), \cq{m} (months), \cq{w} (weeks) or \cq{d} (days).
-The first age in the range represents the oldest data, and will be
-coloured red in the HTML; the second age represents the newest,
-coloured green. If the second age is not specified, it will default
-to zero (so that green means data which has been accessed \e{just
-now}).
+(This syntax is also used by the \cw{-a} option.) The first age in the
+range represents the oldest data, and will be coloured red in the
+HTML; the second age represents the newest, coloured green. If the
+second age is not specified, it will default to zero (so that green
+means data which has been accessed \e{just now}).
 
 For example, \cw{-r 2y} will mark data in red if it has been unused
 for two years or more, and green if it has been accessed just now.

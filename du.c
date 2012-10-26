@@ -185,9 +185,9 @@ static void du_recurse(char **path, size_t pathlen, size_t *pathsize,
      * symlink.
      */
     if (toplevel)
-	statret = STAT(*path, &st);
+	statret = STAT_FUNC(*path, &st);
     else
-	statret = LSTAT(*path, &st);
+	statret = LSTAT_FUNC(*path, &st);
     if (statret < 0) {
 	err(gotdata_ctx, "%s: lstat: %s\n", *path, strerror(errno));
 	return;

@@ -102,12 +102,12 @@ extern char pathsep;
 
 #if defined HAVE_LSTAT64 && HAVE_STAT64
 #define STRUCT_STAT struct stat64
-#define LSTAT lstat64
-#define STAT stat64
+#define LSTAT_FUNC lstat64
+#define STAT_FUNC stat64
 #else
 #define STRUCT_STAT struct stat
-#define LSTAT lstat
-#define STAT stat
+#define LSTAT_FUNC lstat
+#define STAT_FUNC stat
 #endif
 
 #define max(x,y) ( (x) > (y) ? (x) : (y) )

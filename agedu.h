@@ -92,6 +92,12 @@
 #  include <netdb.h>
 #endif
     
+#ifndef HOST_NAME_MAX
+/* Reportedly at least one Solaris fails to comply with its POSIX
+ * requirement to define this (see POSIX spec for gethostname) */
+#define HOST_NAME_MAX 255 /* upper bound specified in SUS */
+#endif
+
 #define PNAME "agedu"
 
 #define DUMPHDR "agedu dump file. pathsep="

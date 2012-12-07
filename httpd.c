@@ -570,7 +570,7 @@ static int make_listening_sockets(struct listenfds *fds, const char *address,
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = 0;
     hints.ai_flags = AI_PASSIVE;
-    ret = getaddrinfo(address, portstr ? portstr : "http", &hints, &addrs);
+    ret = getaddrinfo(address, portstr, &hints, &addrs);
     if (ret) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(ret));
         return -1;

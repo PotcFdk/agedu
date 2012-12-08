@@ -95,8 +95,54 @@ struct trie_string {
     char string[];
 };
 
+static const char magic_ident_string[16] = "agedu index file";
+struct trie_magic {
+    /*
+     * 'Magic numbers' to go at the start of an agedu index file.
+     * These are checked (using trie_check_magic) by every agedu mode
+     * which reads a pre-existing index.
+     *
+     * As well as identifying an agedu file from any other kind of
+     * file, this magic-number structure is also intended to detect
+     * agedu files which were written on the wrong platform and hence
+     * whose structure layouts are incompatible. To make that as
+     * reliable as possible, I design the structure of magic numbers
+     * as follows: it contains one of each integer type I might use,
+     * each containing a different magic number, and each followed by
+     * a char to indicate where it ends in the file. One byte is set
+     * to the length of the magic-number structure itself, which means
+     * that no two structures of different lengths can possibly
+     * compare equal even if by some chance they match up to the
+     * length of the shorter one. Finally, the whole magic number
+     * structure is memset to another random byte value before
+     * initialising any of these fields, so that padding in between
+     * can be readily identified.
+     */
+    char ident[16];                    /* human-readable string */
+
+    unsigned char magic_len;
+
+    unsigned long long longlong_magic;
+    unsigned char postlonglong_char_magic;
+
+    off_t offset_magic;
+    unsigned char postoffset_char_magic;
+
+    size_t size_magic;
+    unsigned char postsize_char_magic;
+
+    void *null_pointer;
+    unsigned char postptr_char_magic;
+
+    unsigned long long_magic;
+    unsigned char postlong_char_magic;
+
+    unsigned short short_magic;
+    unsigned char postshort_char_magic;
+};
+
 struct trie_header {
-    unsigned long magic;
+    struct trie_magic magic;
     off_t root, indexroot;
     int count;
     size_t maxpathlen;
@@ -118,8 +164,41 @@ union trie_node {
 	char string[1];
     } str;
 };
-#define TRIE_MAGIC 0x75646761UL
 #define TRIE_ALIGN alignof(union trie_node)
+
+static void setup_magic(struct trie_magic *th)
+{
+    /*
+     * Magic values are chosen so that every byte value used is
+     * distinct (so that we can't fail to spot endianness issues), and
+     * we cast 64 bits of data into each integer type just in case
+     * the platform makes it longer than we expect it to be.
+     */
+
+    memset(th, 0xCDU, sizeof(*th));
+
+    th->magic_len = sizeof(*th);
+
+    memcpy(th->ident, magic_ident_string, 16);
+
+    th->longlong_magic = 0x5583F34D5D84F73CULL;
+    th->postlonglong_char_magic = 0xDDU;
+
+    th->offset_magic = (off_t)0xB39BF9AD56D48E0BULL;
+    th->postoffset_char_magic = 0x95U;
+
+    th->size_magic = (size_t)0x6EC752B0EEAEBAC1ULL;
+    th->postsize_char_magic = 0x77U;
+
+    th->null_pointer = NULL;
+    th->postptr_char_magic = 0x71U;
+
+    th->long_magic = (unsigned long)0xA81A5E1F44334716ULL;
+    th->postlong_char_magic = 0x99U;
+
+    th->short_magic = (unsigned short)0x0C8BD7984B68D9FCULL;
+    th->postshort_char_magic = 0x35U;
+}
 
 /* ----------------------------------------------------------------------
  * Trie-building functions.
@@ -187,7 +266,7 @@ triebuild *triebuild_new(int fd)
     tb->switchsize = 0;
     tb->maxpathlen = 0;
 
-    th.magic = TRIE_MAGIC;
+    setup_magic(&th.magic);
     th.root = th.count = 0;
     th.indexroot = 0;
     th.maxpathlen = 0;
@@ -364,7 +443,7 @@ int triebuild_finish(triebuild *tb)
 {
     struct trie_header th;
 
-    th.magic = TRIE_MAGIC;
+    setup_magic(&th.magic);
     th.root = triebuild_unwind(tb, 0, &th.count);
     th.indexroot = 0;
     th.maxpathlen = tb->maxpathlen;
@@ -501,6 +580,15 @@ void trie_fake_dir_atimes(void *t)
 
 #define NODE(t, off, type) \
     ((const struct type *)((const char *)(t) + (off)))
+
+int trie_check_magic(const void *t)
+{
+    const struct trie_header *hdr = NODE(t, 0, trie_header);
+    struct trie_magic magic;
+
+    setup_magic(&magic);
+    return !memcmp(&magic, &hdr->magic, sizeof(magic));
+}
 
 size_t trie_maxpathlen(const void *t)
 {

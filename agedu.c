@@ -1272,6 +1272,11 @@ int main(int argc, char **argv)
 		perror(PNAME ": mmap");
 		return 1;
 	    }
+            if (!trie_check_magic(mappedfile)) {
+		fprintf(stderr, "%s: %s: magic numbers did not match\n"
+                        "%s: check that the index was built by this version of agedu on this platform\n", PNAME, filename, PNAME);
+		return 1;
+            }
 	    pathsep = trie_pathsep(mappedfile);
 
 	    /*
@@ -1343,6 +1348,21 @@ int main(int argc, char **argv)
 	    if (!mappedfile) {
 		fprintf(stderr, "%s: %s: mmap: %s\n", PNAME, filename,
 			strerror(errno));
+		if (!querydir) {
+		    printf("Status: 500\nContent-type: text/html\n\n"
+			   "<html><head>"
+			   "<title>500 Internal Server Error</title>"
+			   "</head><body>"
+			   "<h1>500 Internal Server Error</h1>"
+			   "<p><code>agedu</code> suffered an internal error."
+			   "</body></html>\n");
+		    return 0;
+		}
+		return 1;
+	    }
+	    if (!trie_check_magic(mappedfile)) {
+		fprintf(stderr, "%s: %s: magic numbers did not match\n"
+                        "%s: check that the index was built by this version of agedu on this platform\n", PNAME, filename, PNAME);
 		if (!querydir) {
 		    printf("Status: 500\nContent-type: text/html\n\n"
 			   "<html><head>"
@@ -1557,6 +1577,11 @@ int main(int argc, char **argv)
 		perror(PNAME ": mmap");
 		return 1;
 	    }
+            if (!trie_check_magic(mappedfile)) {
+		fprintf(stderr, "%s: %s: magic numbers did not match\n"
+                        "%s: check that the index was built by this version of agedu on this platform\n", PNAME, filename, PNAME);
+		return 1;
+            }
 	    pathsep = trie_pathsep(mappedfile);
 
 	    maxpathlen = trie_maxpathlen(mappedfile);
@@ -1589,6 +1614,11 @@ int main(int argc, char **argv)
 		perror(PNAME ": mmap");
 		return 1;
 	    }
+            if (!trie_check_magic(mappedfile)) {
+		fprintf(stderr, "%s: %s: magic numbers did not match\n"
+                        "%s: check that the index was built by this version of agedu on this platform\n", PNAME, filename, PNAME);
+		return 1;
+            }
 	    pathsep = trie_pathsep(mappedfile);
 
 	    dcfg.address = httpserveraddr;

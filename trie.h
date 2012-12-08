@@ -66,6 +66,14 @@ void trie_fake_dir_atimes(void *t);
  */
 
 /*
+ * Check the magic numbers at the start of the file. This should also
+ * verify that the file was built on a platform whose structure layout
+ * matches that of the agedu reading it. Returns nonzero on successful
+ * match, zero on mismatch.
+ */
+int trie_check_magic(const void *t);
+
+/*
  * Return the path separator character in use in the trie.
  */
 char trie_pathsep(const void *t);

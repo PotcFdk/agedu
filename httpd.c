@@ -750,6 +750,7 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
     int authtype;
     char *authstring = NULL;
     char *hostname;
+    const char *openbracket, *closebracket;
     struct sockaddr_in addr;
     socklen_t addrlen;
     struct html_config cfg = *incfg;
@@ -850,10 +851,20 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
 	fprintf(stderr, PNAME ": authentication method not supported\n");
 	exit(1);
     }
-    if (port == 80) {
-	printf("URL: http://%s/\n", hostname);
+    if (strchr(hostname, ':')) {
+        /* If the hostname is an IPv6 address literal, enclose it in
+         * square brackets to prevent misinterpretation of the
+         * colons. */
+        openbracket = "[";
+        closebracket = "]";
     } else {
-	printf("URL: http://%s:%d/\n", hostname, port);
+        openbracket = closebracket = "";
+    }
+    if (port == 80) {
+	printf("URL: http://%s%s%s/\n", openbracket, hostname, closebracket);
+    } else {
+	printf("URL: http://%s%s%s:%d/\n", openbracket, hostname, closebracket,
+               port);
     }
     fflush(stdout);
 

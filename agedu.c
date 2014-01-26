@@ -816,13 +816,33 @@ int main(int argc, char **argv)
 		    {
 			char *port;
 			if (optval[0] == '[' &&
-			    (port = strchr(optval, ']')) != NULL)
-			    port++;
-			else
+			    (port = strchr(optval, ']')) != NULL) {
+                            /* trim the [] from around the hostname */
+			    *port++ = '\0';
+                            optval++;
+                        } else {
 			    port = optval;
+                        }
 			port += strcspn(port, ":");
 			if (port && *port)
 			    *port++ = '\0';
+
+                        if (strchr(port, ':')) {
+                            /*
+                             * Multiple (non-square-bracket-protected)
+                             * colons have been seen in the --address
+                             * argument. That probably means someone
+                             * has used an unprotected IPv6 address
+                             * literal.
+                             */
+                            fprintf(stderr, "%s: option '--address' expects a "
+                                    "hostname, or hostname:port combination\n"
+                                    "%s: if hostname is an IPv6 numeric "
+                                    "address, enclose it in []\n",
+                                    PNAME, PNAME);
+                            return 1;
+                        }
+
                         if (!strcmp(optval, "ANY"))
                             httpserveraddr = NULL;
                         else

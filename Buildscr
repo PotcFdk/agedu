@@ -4,9 +4,14 @@
 
 module agedu
 
-in agedu do sed '/AC_INIT/s/6.66/r$(revision)/' configure.ac > tmp.ac
+set Version $(!builddate).$(vcsid)
+
+in agedu do sed '/AC_INIT/s/6.66/$(Version)/' configure.ac > tmp.ac
 in agedu do mv tmp.ac configure.ac
 in agedu do ./mkauto.sh
+
+# use perl to avoid inconsistent behaviour of echo '\v'
+in agedu do perl -e 'print "\n\\versionid agedu version $$ARGV[0]\n"' $(Version) >> agedu.but
 
 # Build the man page. This also tests the automake setup to ensure
 # configure actually works; but we use a self-delegation (i.e. do all
@@ -19,13 +24,13 @@ delegate -
   return agedu/*.1
 enddelegate
 
-in . do cp -R agedu agedu-r$(revision)
-in . do tar chzvf agedu-r$(revision).tar.gz agedu-r$(revision)
+in . do cp -R agedu agedu-$(Version)
+in . do tar chzvf agedu-$(Version).tar.gz agedu-$(Version)
 
 in agedu do halibut --html=manpage.html agedu.but
 in agedu do halibut --html=tree.html tree.but
 
-deliver agedu-r$(revision).tar.gz $@
+deliver agedu-$(Version).tar.gz $@
 deliver agedu/manpage.html $@
 deliver agedu/tree.html $@
 

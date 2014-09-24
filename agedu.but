@@ -734,5 +734,3 @@ have been unused for months or years, that's not a problem.)
 
 \cw{agedu} is free software, distributed under the MIT licence. Type
 \cw{agedu --licence} to see the full licence text.
-
-\versionid $Id$

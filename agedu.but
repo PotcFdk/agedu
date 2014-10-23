@@ -283,7 +283,18 @@ CGI-style data to its standard output.
 The actual CGI program itself should be a tiny wrapper around
 \cw{agedu} which passes it the \cw{--cgi} option, and also
 (probably) \cw{-f} to locate the index file. \cw{agedu} will do
-everything else.
+everything else. For example, your script might read
+
+\c #!/bin/sh
+\c /some/path/to/agedu --cgi -f /some/other/path/to/agedu.dat
+\e iiiiiiiiiiiiii               iiiiiiiiiiiiiiiiiiii
+
+(Note that \cw{agedu} will produce the \e{entire} CGI output,
+including status code, HTTP headers and the full HTML document. If you
+try to surround the call to \cw{agedu --cgi} with code that adds your
+own HTML header and footer, you won't get the results you want, and
+\cw{agedu}'s HTTP-level features such as auto-redirecting to canonical
+versions of URIs will stop working.)
 
 No access control is performed in this mode: restricting access to
 CGI scripts is assumed to be the job of the web server.

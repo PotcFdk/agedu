@@ -321,8 +321,8 @@ static void compute_display_size(unsigned long long size,
 				 const char **fmt, double *display_size)
 {
     static const char *const fmts[] = {
-	"%g b", "%g Kb", "%#.1f Mb", "%#.1f Gb", "%#.1f Tb",
-	"%#.1f Pb", "%#.1f Eb", "%#.1f Zb", "%#.1f Yb"
+	"%g B", "%g kB", "%#.1f MB", "%#.1f GB", "%#.1f TB",
+	"%#.1f PB", "%#.1f EB", "%#.1f ZB", "%#.1f YB"
     };
     int shift = 0;
     unsigned long long tmpsize;

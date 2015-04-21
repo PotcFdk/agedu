@@ -95,9 +95,41 @@ could have done
 for a single self-contained run of \cw{agedu} which builds its
 index, serves web pages from it, and cleans it up when finished.
 
+In some situations, you might want to scan the directory structure of
+one computer, but run \cw{agedu}'s user interface on another. In that
+case, you can do your scan using the \cw{agedu -S} option in place of
+\cw{agedu -s}, which will make \cw{agedu} not bother building an index
+file but instead just write out its scan results in plain text on
+standard output; then you can funnel that output to the other machine
+using SSH (or whatever other technique you prefer), and there, run
+\cw{agedu -L} to load in the textual dump and turn it into an index
+file. For example, you might run a command like this (plus any
+\cw{ssh} options you need) on the machine you want to scan:
+
+\c $ agedu -S /home/fred | ssh indexing-machine agedu -L
+\e   bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+
+or, equivalently, run something like this on the other machine:
+
+\c $ ssh machine-to-scan agedu -S /home/fred | agedu -L
+\e   bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+
+Either way, the \cw{agedu -L} command will create an \cw{agedu.dat}
+index file, which you can then use with \cw{agedu -w} just as above.
+
+(Another way to do this might be to build the index file on the first
+machine as normal, and then just copy it to the other machine once
+it's complete. However, for efficiency, the index file is formatted
+differently depending on the CPU architecture that \cw{agedu} is
+compiled for. So if that doesn't match between the two machines \dash
+e.g. if one is a 32-bit machine and one 64-bit \dash then
+\cw{agedu.dat} files written on one machine will not work on the
+other. The technique described above using \cw{-S} and \cw{-L} should
+work between any two machines.)
+
 If you don't have a graphical web browser, you can do text-based
-queries as well. Having scanned \cw{/home/fred} as above, you might
-run
+queries instead of using \cw{agedu}'s web interface. Having scanned
+\cw{/home/fred} in any of the ways suggested above, you might run
 
 \c $ agedu -t /home/fred
 \e   bbbbbbbbbbbbbbbbbbb
@@ -221,35 +253,37 @@ agedu.dat}. However, you can also put \cw{-R} on the end of a
 command line to indicate that \cw{agedu} should delete its index
 file after it finishes performing other operations.
 
-\dt \cw{-D} or \cw{--dump}
+\dt \cw{-S} \e{directory} or \cw{--scan-dump} \e{directory}
 
-\dd In this mode, \cw{agedu} reads an existing index file and
-produces a dump of its contents on standard output. This dump can
-later be loaded into a new index file, perhaps on another computer.
+\dd In this mode, \cw{agedu} will scan a directory tree and convert
+the results straight into a textual dump on standard output, without
+generating an index file at all. The dump data is intended for
+\cw{agedu -L} to read.
 
 \dt \cw{-L} or \cw{--load}
 
 \dd In this mode, \cw{agedu} expects to read a dump produced by the
-\cw{-D} option from its standard input. It constructs an index file
+\cw{-S} option from its standard input. It constructs an index file
 from that dump, exactly as it would have if it had read the same
 data from a disk scan in \cw{-s} mode.
 
-\dt \cw{-S} \e{directory} or \cw{--scan-dump} \e{directory}
+\dt \cw{-D} or \cw{--dump}
 
-\dd In this mode, \cw{agedu} will scan a directory tree and convert
-the results straight into a dump on standard output, without
-generating an index file at all. So running \cw{agedu -S /path}
-should produce equivalent output to that of \cw{agedu -s /path -D},
-except that the latter will produce an index file as a side effect
-whereas \cw{-S} will not.
+\dd In this mode, \cw{agedu} reads an existing index file and produces
+a dump of its contents on standard output, in the same format used by
+\cw{-S} and \cw{-L}. This option could be used to convert an existing
+index file into a format acceptable to a different kind of computer,
+by dumping it using \cw{-D} and then loading the dump back in on the
+other machine using \cw{-L}.
 
 \lcont{
 
-(The output will not be exactly \e{identical}, due to a
-difference in treatment of last-access times on directories.
-However, it should be effectively equivalent for most purposes. See
-the documentation of the \cw{--dir-atime} option in the next section
-for further detail.)
+(The output of \cw{agedu -D} on an existing index file will not be
+exactly \e{identical} to what \cw{agedu -S} would have originally
+produced, due to a difference in treatment of last-access times on
+directories. However, it should be effectively equivalent for most
+purposes. See the documentation of the \cw{--dir-atime} option in the
+next section for further detail.)
 
 }
 

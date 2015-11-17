@@ -35,8 +35,7 @@ deliver agedu/manpage.html $@
 deliver agedu/tree.html $@
 
 delegate windows
-  # FIXME: Cygwin alternative?
-  in agedu do cmd /c vcvars32 \& cl winscan.c
+  in agedu do/win vcvars32 && cl winscan.c
   return agedu/winscan.exe
 enddelegate
 

@@ -36,6 +36,11 @@ deliver agedu/tree.html $@
 
 delegate windows
   in agedu do/win vcvars32 && cl winscan.c
+  # Code-sign this Windows binary, if the local bob config provides a
+  # script to do so. We assume here that the script accepts an -i
+  # option to provide a 'more info' URL, and that it signs the file in
+  # place.
+  ifneq "$(winsigncode)" "" in agedu do $(winsigncode) -i http://www.chiark.greenend.org.uk/~sgtatham/agedu/ winscan.exe
   return agedu/winscan.exe
 enddelegate
 

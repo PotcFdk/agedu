@@ -35,7 +35,7 @@ deliver agedu/manpage.html $@
 deliver agedu/tree.html $@
 
 delegate windows
-  in agedu do/win vcvars32 && cl winscan.c
+  in agedu with visualstudio do/win cl winscan.c
   # Code-sign this Windows binary, if the local bob config provides a
   # script to do so. We assume here that the script accepts an -i
   # option to provide a 'more info' URL, and that it signs the file in

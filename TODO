@@ -92,18 +92,102 @@ TODO list for agedu
       exactly like the Unix version might be useful to some people,
       but would certainly be strange and confusing to others.
 
- - it might conceivably be useful to support a choice of indexing
-   strategies. The current "continuous index" mechanism's tradeoff of
-   taking O(N log N) space in order to be able to support any age
-   cutoff you like is not going to be ideal for everybody. A second
-   more conventional "discrete index" mechanism which allows the
-   user to specify a number of fixed cutoffs and just indexes each
-   directory on those alone would undoubtedly be a useful thing for
-   large-scale users. This will require considerable thought about
-   how to make the indexers pluggable at both index-generation time
-   and query time.
-    * however, now we have the cut-down version of the continuous
-      index, the space saving is less compelling.
+ - replacing the index data structure with a layered range tree.
+    + The basic idea of the data structure:
+       * store a search tree ordered by atime, in which every node
+         stores an array of pairs (pathname index, cumulative size)
+         describing the data in that node's subtree, ordered by the
+         pathname index.
+       * Also, alongside each element in a node's array is the index
+         of the corresponding location in the sort order in the array
+         at each child node.
+    + To search the tree for a given (path index, atime) query point:
+       * Start by doing a log-time search for the path index in the
+         array at the root node.
+       * Now, every time you descend to a child node, you can use the
+         crosslinks between the arrays to find the corresponding
+         search position in the new node's array, in constant time.
+       * So your overall search still takes log time, and from every
+         node you can read off the total size of stuff in that subtree
+         less than the query path index, which is enough to find the
+         total size of stuff in the desired quadrant.
+    + This also enables a 3-sided query (i.e. specifying both start
+      and end pathname index) in a single operation: just start by
+      finding _both_ your pathname index endpoints in the root node's
+      array, and then as you descend the tree you can read off the
+      total size of stuff in each subtree _between_ those two
+      endpoints, by subtracting the two cumulative sizes.
+       * For the existing kind of query, this is only a minor
+         optimisation, and doesn't affect the asymptotic performance
+         of the query.
+       * But the advantage is that it also lets you do an inverse
+         lookup, of the form 'Given a pathname interval (subdirectory)
+         and a target *size* X, find an atime T such that the amount
+         of data in that subdir older than T is X.' In the current
+         agedu data structure that takes log^2 time, because you have
+         to do a log-time query for each step of a binary search over
+         candidate atimes; but if you do a 3-sided search in this
+         range tree system, you can use the subtree sizes instead of
+         the tree sort order to decide which direction to go as you
+         descend the tree, just like querying an ordinary annotated
+         tree.
+       * I think this inverse lookup could be helpful for speeding up
+         the HTML report generation. The normal query answers the
+         question 'Where should the boundary be between these two
+         colour values?', and agedu runs that query once per output
+         colour. But the inverse query answers 'What colour should
+         _this pixel_ in the output bar be?', so for very small bars
+         (of which there will be a lot), inverse queries would surely
+         get the needed information faster.
+          - Also, I quite like the idea of a hybrid strategy:
+             + for a bar with fewer pixels than colours, determine the
+               colour of its middle pixel by an inverse lookup, then
+               recurse into each half
+             + but if there are more pixels than colours, determine
+               the location of the middle colour by a forward lookup,
+               and recurse similarly
+             + and at each level of the recursion, pick one of those
+               strategies as appropriate.
+    + Without having actually implemented it in practice, my guess is
+      that this structure as described above is comparable in both
+      space and time to the current one. It's still N log N space in
+      principle; you still get to optimise to some degree by
+      disregarding uninteresting differences between pathname indices
+      (in this case, by compressing the arrays at each node, rather
+      than by discarding intermediate states of the evolving tree);
+      and it still takes log time to answer the existing kind of
+      query, namely 'what is the total size of stuff in this subdir
+      older than this atime?'.
+    + There's also a way to compress the index to a smaller size, at
+      the cost of query time, by replacing the array at each tree node
+      with a bit-vector that just says which child each logical array
+      element came from, and storing a cumulative element count and
+      cumulative size per _word_ of the bit-vector instead of a
+      cumulative size for every element. This means that at every step
+      down the tree you can only compute the cumulative size
+      approximately from the data actually stored at that tree node,
+      and to fix up the errors you have to look at the two partial
+      words at each end of your search and chase each individual
+      element down the tree to the bottom to find its exact size. Done
+      naively, this gives you O(log^3 n) lookup time (at each of the
+      log n steps down the tree, there are log n extra points you have
+      to sort out, each of which needs another log n pass to the
+      bottom of the tree); you can improve on that by storing extra
+      indices (also bit-packed) that allow you to jump multiple levels
+      down the tree, permitting an assortment of tradeoffs that let
+      you _almost_ get rid of a log factor - you can have O(n) space
+      and O(n log^{2+e} n) for e as small as you want (paying for a
+      smaller e with a larger constant factor), or conversely
+      O(n^{1+e}) space and exactly O(n log^2 n) query time, or the
+      in-between compromise of O(n log log n) space and O(n log^2 n
+      log log n) query time.
+       + source: "A Functional Approach to Data Structures and Its Use
+         in Multidimensional Searching", B. Chazelle, SIAM J. Comput.
+         17 (1988), 427-462
+       + and I _think_ it should in principle be possible to vary the
+         frequency of cumulative counts/sizes so as to trade off space
+         and time smoothly between that compressed representation and
+         the full layered range tree.
 
  - A user requested what's essentially a VFS layer: given multiple
    index files and a map of how they fit into an overall namespace,

@@ -351,6 +351,8 @@ static void text_query(const void *mappedfile, const char *querydir,
         HELPARG("age[-age]") HELPOPT("[--web,--html] set limits of colour coding") \
     VAL(OUTFILE) SHORT(o) LONG(output) \
 	HELPARG("filename") HELPOPT("[--html] specify output file or directory name") \
+    NOVAL(NUMERIC) LONG(numeric) \
+	HELPOPT("[--html] name output files numerically") \
     VAL(SERVERADDR) LONG(address) LONG(addr) LONG(server_address) \
               LONG(server_addr) \
         HELPARG("addr[:port]") HELPOPT("[--web] specify HTTP server address") \
@@ -506,6 +508,7 @@ int main(int argc, char **argv)
     const char *httpserverport = NULL;
     const char *httpauthdata = NULL;
     const char *outfile = NULL;
+    int numeric = 0;
     const char *html_title = PNAME;
     int auth = HTTPD_AUTH_MAGIC | HTTPD_AUTH_BASIC;
     int progress = 1;
@@ -793,6 +796,9 @@ int main(int argc, char **argv)
 		    break;
 		  case OPT_OUTFILE:
 		    outfile = optval;
+		    break;
+		  case OPT_NUMERIC:
+		    numeric = 1;
 		    break;
                   case OPT_HTMLTITLE:
                     html_title = optval;
@@ -1414,8 +1420,13 @@ int main(int argc, char **argv)
 		cfg.newest = htmlnewest;
 		cfg.showfiles = showfiles;
 	    } else {
-                cfg.uriformat = "/index.html%|/%/p.html";
-                cfg.fileformat = "/index.html%|/%/p.html";
+                if (!numeric) {
+                    cfg.uriformat = "/index.html%|/%/p.html";
+                    cfg.fileformat = "/index.html%|/%/p.html";
+                } else {
+                    cfg.uriformat = "/index.html%|/%n.html";
+                    cfg.fileformat = "/index.html%|/%n.html";
+                }
 		cfg.autoage = htmlautoagerange;
 		cfg.oldest = htmloldest;
 		cfg.newest = htmlnewest;

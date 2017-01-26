@@ -610,6 +610,30 @@ mode, the argument is treated as the name of a directory: the
 directory will be created if it does not already exist, and the
 output HTML files will be created inside it.
 
+The following option affects only the stand-alone HTML generation mode
+\cw{-H}, and even then, only in recursive mode (with \cw{-d}):
+
+\dt \cw{--numeric}
+
+\dd This option tells \cw{agedu} to name most of its output HTML files
+numerically. The root of the whole output file collection will still
+be called \cw{index.html}, but all the rest will have names like
+\cw{73.html} or \cw{12525.html}. (The numbers are essentially
+arbitrary; in fact, they're indices of nodes in the data structure
+used by \cw{agedu}'s index file.)
+
+\lcont{
+
+This system of file naming is less intuitive than the default of
+naming files after the sub-pathname they index. It's also less stable:
+the same pathname will not necessarily be represented by the same
+filename if \cw{agedu -H} is re-run after another scan of the same
+directory tree. However, it does have the virtue that it keeps the
+filenames \e{short}, so that even if your directory tree is very deep,
+the output HTML files won't exceed any OS limit on filename length.
+
+}
+
 The following options affect the web server mode \cw{-w}, and in some
 cases also the stand-alone HTML generation mode \cw{-H}:
 

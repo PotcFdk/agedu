@@ -34,14 +34,19 @@ deliver agedu-$(Version).tar.gz $@
 deliver agedu/manpage.html $@
 deliver agedu/tree.html $@
 
-delegate windows
-  in agedu with visualstudio do/win cl winscan.c
+ifneq "$(VISUAL_STUDIO)" "yes" then
+  in agedu with clangcl64 do clang-cl /c winscan.c && lld-link /out:winscan.exe winscan.obj
   # Code-sign this Windows binary, if the local bob config provides a
   # script to do so. We assume here that the script accepts an -i
   # option to provide a 'more info' URL, and that it signs the file in
   # place.
-  ifneq "$(winsigncode)" "" in agedu do $(winsigncode) -i https://www.chiark.greenend.org.uk/~sgtatham/agedu/ winscan.exe
-  return agedu/winscan.exe
-enddelegate
+  ifneq "$(cross_winsigncode)" "" in agedu do $(cross_winsigncode) -i https://www.chiark.greenend.org.uk/~sgtatham/agedu/ winscan.exe
+else
+  delegate windows
+    in agedu with visualstudio do/win cl winscan.c
+    ifneq "$(winsigncode)" "" in agedu do $(winsigncode) -i https://www.chiark.greenend.org.uk/~sgtatham/agedu/ winscan.exe
+    return agedu/winscan.exe
+  enddelegate
+endif
 
 deliver agedu/winscan.exe ageduscan.exe

@@ -1506,9 +1506,15 @@ int main(int argc, char **argv)
 
 		/*
 		 * Trim trailing slash, just in case.
+                 *
+                 * (Note that we do this if pathlen > 1, not if
+                 * pathlen > 0. That is, the one case of a trailing
+                 * slash that we leave intact is the case where it's
+                 * the whole string because the query directory is
+                 * just "/".)
 		 */
 		pathlen = strlen(querydir);
-		if (pathlen > 0 && querydir[pathlen-1] == pathsep)
+		if (pathlen > 1 && querydir[pathlen-1] == pathsep)
 		    querydir[--pathlen] = '\0';
 
 		xi = trie_before(mappedfile, querydir);

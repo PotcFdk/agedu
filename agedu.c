@@ -1153,7 +1153,7 @@ int main(int argc, char **argv)
 		}
 
 		mappedfile = mmap(NULL, totalsize, PROT_READ|PROT_WRITE,MAP_SHARED, fd, 0);
-		if (!mappedfile) {
+		if (mappedfile == MAP_FAILED) {
 		    perror(PNAME ": mmap");
 		    return 1;
 		}
@@ -1197,7 +1197,7 @@ int main(int argc, char **argv)
 			}
 
 			mappedfile = mmap(NULL, totalsize, PROT_READ|PROT_WRITE,MAP_SHARED, fd, 0);
-			if (!mappedfile) {
+			if (mappedfile == MAP_FAILED) {
 			    perror(PNAME ": mmap");
 			    return 1;
 			}
@@ -1294,7 +1294,7 @@ int main(int argc, char **argv)
 	    }
 	    totalsize = st.st_size;
 	    mappedfile = mmap(NULL, totalsize, PROT_READ, MAP_SHARED, fd, 0);
-	    if (!mappedfile) {
+	    if (mappedfile == MAP_FAILED) {
 		perror(PNAME ": mmap");
 		return 1;
 	    }
@@ -1371,7 +1371,7 @@ int main(int argc, char **argv)
 	    }
 	    totalsize = st.st_size;
 	    mappedfile = mmap(NULL, totalsize, PROT_READ, MAP_SHARED, fd, 0);
-	    if (!mappedfile) {
+	    if (mappedfile == MAP_FAILED) {
 		fprintf(stderr, "%s: %s: mmap: %s\n", PNAME, filename,
 			strerror(errno));
 		if (!querydir) {
@@ -1610,7 +1610,7 @@ int main(int argc, char **argv)
 	    }
 	    totalsize = st.st_size;
 	    mappedfile = mmap(NULL, totalsize, PROT_READ, MAP_SHARED, fd, 0);
-	    if (!mappedfile) {
+	    if (mappedfile == MAP_FAILED) {
 		perror(PNAME ": mmap");
 		return 1;
 	    }
@@ -1647,7 +1647,7 @@ int main(int argc, char **argv)
 	    }
 	    totalsize = st.st_size;
 	    mappedfile = mmap(NULL, totalsize, PROT_READ, MAP_SHARED, fd, 0);
-	    if (!mappedfile) {
+	    if (mappedfile == MAP_FAILED) {
 		perror(PNAME ": mmap");
 		return 1;
 	    }

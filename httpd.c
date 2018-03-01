@@ -389,7 +389,6 @@ struct fd *new_fdstruct(int fd, int type)
 int check_owning_uid(int fd, int flip)
 {
     struct sockaddr_storage sock, peer;
-    int connected;
     socklen_t addrlen;
     char linebuf[4096], matchbuf[128];
     char *filename;
@@ -402,10 +401,8 @@ int check_owning_uid(int fd, int flip)
 	exit(1);
     }
     addrlen = sizeof(peer);
-    connected = 1;
     if (getpeername(fd, (struct sockaddr *)&peer, &addrlen)) {
 	if (errno == ENOTCONN) {
-            connected = 0;
             memset(&peer, 0, sizeof(peer));
             peer.ss_family = sock.ss_family;
 	} else {
@@ -775,13 +772,11 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
 	       const struct html_config *incfg)
 {
     struct listenfds lfds;
-    int ret, port;
+    int port;
     int authtype;
     char *authstring = NULL;
     char *hostname;
     const char *openbracket, *closebracket;
-    struct sockaddr_in addr;
-    socklen_t addrlen;
     struct html_config cfg = *incfg;
 
     /*

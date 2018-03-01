@@ -681,9 +681,8 @@ int parse_path(const void *t, const char *path,
 
 char *format_string(const char *fmt, unsigned long index, const void *t)
 {
-    unsigned long indexout, parseret;
+    unsigned long indexout;
     char *ret;
-    const char *stepfmt = fmt;
     int nescape = 0;
 
     /*
@@ -705,8 +704,6 @@ char *format_string(const char *fmt, unsigned long index, const void *t)
      * work, etc.
      */
     while (1) {
-        struct format_option opt = get_format_option(&stepfmt);
-
         /*
          * Parse the pathname and see if it gives the right index.
          */

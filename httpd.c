@@ -393,7 +393,7 @@ int check_owning_uid(int fd, int flip)
     socklen_t addrlen;
     char linebuf[4096], matchbuf[128];
     char *filename;
-    int matchcol, uidcol;
+    int matchlen;
     FILE *fp;
 
     addrlen = sizeof(sock);
@@ -431,8 +431,6 @@ int check_owning_uid(int fd, int flip)
                 peer4->sin_addr.s_addr, ntohs(peer4->sin_port),
                 sock4->sin_addr.s_addr, ntohs(sock4->sin_port));
         filename = "/proc/net/tcp";
-        matchcol = 6;
-        uidcol = 75;
     } else
 #endif
 #ifndef NO_IPV6
@@ -454,22 +452,53 @@ int check_owning_uid(int fd, int flip)
         p += sprintf(p, ":%04X", ntohs(sock6->sin6_port));
 
         filename = "/proc/net/tcp6";
-        matchcol = 6;
-        uidcol = 123;
     } else
 #endif
     {
         return -1;                     /* unidentified family */
     }
 
+    matchlen = strlen(matchbuf);
     fp = fopen(filename, "r");
     if (fp) {
 	while (fgets(linebuf, sizeof(linebuf), fp)) {
-	    if (strlen(linebuf) >= uidcol &&
-		!strncmp(linebuf+matchcol, matchbuf, strlen(matchbuf))) {
+            /*
+             * Check for, and skip over, the initial sequence number
+             * that appears before the sockaddr/peeraddr pair. This is
+             * printf'ed as "%4d: ", so it could be prefixed by
+             * spaces, but could also be longer than 4 digits.
+             */
+            const char *p = linebuf;
+            p += strspn(p, " ");
+            p += strspn(p, "0123456789");
+            if (*p != ':')
+                goto not_this_line;
+            p++;
+            p += strspn(p, " ");
+
+	    if (!strncmp(p, matchbuf, matchlen)) {
+                /*
+                 * This line matches the address string. Skip 4 words
+                 * after that (TCP state-machine state, tx/rx queue,
+                 * timer details, number of retransmissions) and then
+                 * we expect to find the uid.
+                 */
+                int word;
+
+                p += matchlen;
+                p += strspn(p, " ");
+
+                for (word = 0; word < 4; word++) {
+                    p += strcspn(p, " ");
+                    if (*p != ' ')
+                        goto not_this_line;
+                    p += strspn(p, " ");
+                }
+
 		fclose(fp);
-		return atoi(linebuf + uidcol);
+		return atoi(p);
 	    }
+          not_this_line:;
 	}
 	fclose(fp);
     }

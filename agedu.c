@@ -11,6 +11,7 @@
 #include "html.h"
 #include "httpd.h"
 #include "fgetline.h"
+#include "dumpfile.h"
 
 /*
  * Path separator. This global variable affects the behaviour of
@@ -53,21 +54,15 @@ struct ctx {
     int fakeatimes;
 };
 
+static dumpfile_write_state writestate;
+
 static void dump_line(const char *pathname, const struct trie_file *tf)
 {
-    const char *p;
-    if (printf("%llu %llu ", tf->size, tf->atime) < 0) goto error;
-    for (p = pathname; *p; p++) {
-	if (*p >= ' ' && *p < 127 && *p != '%') {
-	    if (putchar(*p) == EOF) goto error;
-	} else {
-	    if (printf("%%%02x", (unsigned char)*p) < 0) goto error;
-	}
-    }
-    if (putchar('\n') == EOF) goto error;
-    return;
-    error:
-    fatal("standard output: %s", strerror(errno));
+    dumpfile_record dr;
+    dr.pathname = pathname;
+    dr.tf = *tf;
+    if (!dump_write_record(&writestate, &dr))
+        fatal("standard output: %s", strerror(errno));
 }
 
 static int gotdata(void *vctx, const char *pathname, const STRUCT_STAT *st)
@@ -972,19 +967,13 @@ int main(int argc, char **argv)
 
 	if (mode == SCAN || mode == SCANDUMP || mode == LOAD) {
 	    const char *scandir = actions[action].arg;
+            dumpfile_load_state *dls;
 
 	    if (mode == LOAD) {
-		char *buf = fgetline(stdin);
-		unsigned newpathsep;
-		buf[strcspn(buf, "\r\n")] = '\0';
-		if (1 != sscanf(buf, DUMPHDR "%x",
-				&newpathsep)) {
-		    fprintf(stderr, "%s: header in dump file not recognised\n",
-			    PNAME);
+                dls = dumpfile_load_init(stdin);
+                if (!dls)
 		    return 1;
-		}
-		pathsep = (char)newpathsep;
-		sfree(buf);
+		pathsep = dumpfile_load_get_pathsep(dls);
 	    }
 
 	    if (mode == SCAN || mode == LOAD) {
@@ -1042,8 +1031,12 @@ int main(int argc, char **argv)
 		    ctx->progwidth = 79;
 	    }
 
-	    if (mode == SCANDUMP)
-		printf(DUMPHDR "%02x\n", (unsigned char)pathsep);
+	    if (mode == SCANDUMP) {
+                writestate.fp = stdout;
+                writestate.pathsep = pathsep;
+                if (!dump_write_header(&writestate))
+                    fatal("standard output: %s", strerror(errno));
+            }
 
 	    /*
 	     * Scan the directory tree, and write out the trie component
@@ -1053,64 +1046,17 @@ int main(int argc, char **argv)
 		ctx->tb = triebuild_new(fd);
 	    }
 	    if (mode == LOAD) {
-		char *buf;
-		int line = 2;
-		while ((buf = fgetline(stdin)) != NULL) {
-		    struct trie_file tf;
-		    char *p, *q;
+                dumpfile_record dr;
+                int retd;
 
-		    buf[strcspn(buf, "\r\n")] = '\0';
-
-		    p = buf;
-		    q = p;
-		    while (*p && *p != ' ') p++;
-		    if (!*p) {
-			fprintf(stderr, "%s: dump file line %d: expected at least"
-				" three fields\n", PNAME, line);
-			return 1;
-		    }
-		    *p++ = '\0';
-		    tf.size = strtoull(q, NULL, 10);
-		    q = p;
-		    while (*p && *p != ' ') p++;
-		    if (!*p) {
-			fprintf(stderr, "%s: dump file line %d: expected at least"
-				" three fields\n", PNAME, line);
-			return 1;
-		    }
-		    *p++ = '\0';
-		    tf.atime = strtoull(q, NULL, 10);
-		    q = buf;
-		    while (*p) {
-			int c = *p;
-			if (*p == '%') {
-			    int i;
-			    p++;
-			    c = 0;
-			    for (i = 0; i < 2; i++) {
-				c *= 16;
-				if (*p >= '0' && *p <= '9')
-				    c += *p - '0';
-				else if (*p >= 'A' && *p <= 'F')
-				    c += *p - ('A' - 10);
-				else if (*p >= 'a' && *p <= 'f')
-				    c += *p - ('a' - 10);
-				else {
-				    fprintf(stderr, "%s: dump file line %d: unable"
-					    " to parse hex escape\n", PNAME, line);
-				}
-				p++;
-			    }
-			} else {
-			    p++;
-			}
-			*q++ = c;
-		    }
-		    *q = '\0';
-		    triebuild_add(ctx->tb, buf, &tf);
-		    sfree(buf);
-		    line++;
-		}
+                while ((retd = dumpfile_load_record(dls, &dr)) != 0) {
+                    if (retd < 0) {
+                        remove(filename);
+                        return 1;
+                    }
+		    triebuild_add(ctx->tb, dr.pathname, &dr.tf);
+                }
+                dumpfile_load_finish(dls);
 	    } else {
 		du(scandir, gotdata, scan_error, ctx);
 	    }
@@ -1624,7 +1570,10 @@ int main(int argc, char **argv)
 	    maxpathlen = trie_maxpathlen(mappedfile);
 	    buf = snewn(maxpathlen, char);
 
-	    printf(DUMPHDR "%02x\n", (unsigned char)pathsep);
+            writestate.fp = stdout;
+            writestate.pathsep = pathsep;
+            if (!dump_write_header(&writestate))
+                fatal("standard output: %s", strerror(errno));
 	    tw = triewalk_new(mappedfile);
 	    while ((tf = triewalk_next(tw, buf)) != NULL)
 		dump_line(buf, tf);

@@ -13,9 +13,10 @@ struct dumpfile_load_state {
     int lineno;
     char *prev_pathname;
     bool sortable;
+    bool check_order;
 };
 
-dumpfile_load_state *dumpfile_load_init(FILE *fp)
+dumpfile_load_state *dumpfile_load_init(FILE *fp, bool check_order)
 {
     char *buf = fgetline(fp);
     if (!buf) {
@@ -44,6 +45,7 @@ dumpfile_load_state *dumpfile_load_init(FILE *fp)
     dls->lineno = 1;
     dls->prev_pathname = NULL;
     dls->sortable = sortable;
+    dls->check_order = check_order;
     return dls;
 }
 
@@ -160,6 +162,13 @@ int dumpfile_load_record(dumpfile_load_state *dls, dumpfile_record *dr)
     }
 
     *q = '\0';
+
+    if (dls->check_order && dls->prev_pathname &&
+        triecmp(dls->prev_pathname, buf, NULL, dls->pathsep) >= 0) {
+        fprintf(stderr, "%s: dump file line %d: pathname sorts before "
+                "pathname on previous line\n", PNAME, dls->lineno);
+        return -1;
+    }
 
     sfree(dls->prev_pathname);
     dls->prev_pathname = buf;

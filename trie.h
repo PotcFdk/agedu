@@ -148,3 +148,9 @@ off_t trie_get_index_offset(const void *t);
  * must be stripped off first.
  */
 void make_successor(char *pathbuf);
+
+/*
+ * String comparison function consistent with the trie's sort order.
+ * Requires the current path separator as a parameter.
+ */
+int triecmp(const char *a, const char *b, int *offset, unsigned char pathsep);

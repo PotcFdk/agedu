@@ -13,15 +13,15 @@
  * the names, like strcmp; also passes back the offset of the
  * first differing character if desired.
  */
-static int trieccmp(unsigned char a, unsigned char b)
+static int trieccmp(unsigned char a, unsigned char b, unsigned char pathsep)
 {
     int ia = (a == '\0' ? '\0' : a == pathsep ? '\1' : a+1);
     int ib = (b == '\0' ? '\0' : b == pathsep ? '\1' : b+1);
     return ia - ib;
 }
 
-static int triencmp(const char *a, size_t alen,
-		    const char *b, size_t blen, int *offset)
+static int triencmp(const char *a, size_t alen, const char *b, size_t blen,
+                    int *offset, unsigned char pathsep)
 {
     int off = 0;
     while (off < alen && off < blen && a[off] == b[off])
@@ -29,12 +29,12 @@ static int triencmp(const char *a, size_t alen,
     if (offset)
 	*offset = off;
     if (off == alen || off == blen) return (off == blen) - (off == alen);
-    return trieccmp(a[off], b[off]);
+    return trieccmp(a[off], b[off], pathsep);
 }
 
-static int triecmp(const char *a, const char *b, int *offset)
+int triecmp(const char *a, const char *b, int *offset, unsigned char pathsep)
 {
-    return triencmp(a, strlen(a), b, strlen(b), offset);
+    return triencmp(a, strlen(a), b, strlen(b), offset, pathsep);
 }
 
 /* ----------------------------------------------------------------------
@@ -385,7 +385,7 @@ void triebuild_add(triebuild *tb, const char *pathname,
 	 * Find the first differing character between this pathname
 	 * and the previous one.
 	 */
-	int ret = triecmp(tb->lastpath, pathname, &depth);
+	int ret = triecmp(tb->lastpath, pathname, &depth, pathsep);
 	assert(ret < 0);
 
 	/*
@@ -614,7 +614,7 @@ unsigned long trie_before(const void *t, const char *pathname)
 
 	    int offset;
 	    int cmp = triencmp(st->string, st->stringlen,
-			       pathname + depth, len-depth, &offset);
+			       pathname + depth, len-depth, &offset, pathsep);
 
 	    if (offset < st->stringlen) {
 		if (cmp < 0)
@@ -631,7 +631,7 @@ unsigned long trie_before(const void *t, const char *pathname)
 
 	    for (i = 0; i < sw->len; i++) {
 		int c = chars[i];
-		int cmp = trieccmp(pathname[depth], c);
+		int cmp = trieccmp(pathname[depth], c, pathsep);
 		if (cmp > 0)
 		    ret += sw->sw[i].subcount;
 		else if (cmp < 0)

@@ -993,7 +993,7 @@ int main(int argc, char **argv)
             dumpfile_load_state *dls;
 
 	    if (mode == LOAD) {
-                dls = dumpfile_load_init(stdin);
+                dls = dumpfile_load_init(stdin, true);
                 if (!dls)
 		    return 1;
 		pathsep = dumpfile_load_get_pathsep(dls);
@@ -1654,7 +1654,7 @@ int main(int argc, char **argv)
             dumpfile_load_state *dls;
             dumpfile_write_state dws;
 
-            dls = dumpfile_load_init(stdin);
+            dls = dumpfile_load_init(stdin, false);
             if (!dls)
                 return 1;
 

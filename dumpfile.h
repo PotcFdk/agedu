@@ -7,7 +7,7 @@ typedef struct dumpfile_record {
     const char *pathname;
 } dumpfile_record;
 
-dumpfile_load_state *dumpfile_load_init(FILE *fp);
+dumpfile_load_state *dumpfile_load_init(FILE *fp, bool check_order);
 /* dumpfile_load_record returns -1 for bad format, 0 for EOF, 1 for success */
 int dumpfile_load_record(dumpfile_load_state *dls, dumpfile_record *dr);
 FILE *dumpfile_load_finish(dumpfile_load_state *dls);

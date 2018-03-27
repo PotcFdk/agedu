@@ -335,6 +335,44 @@ CGI scripts is assumed to be the job of the web server.
 
 }
 
+\dt \cw{--presort} and \cw{--postsort}
+
+\dd In these two modes, \cw{agedu} will expect to read a textual data
+dump from its standard input of the form produced by \cw{-S} (and
+\c{-D}). It will transform the data into a different version of its
+text dump format, and write the transformed version on standard output.
+
+\lcont{
+
+The ordinary dump file format is reasonably readable, but loading it
+into an index file using \cw{agedu -L} requires it to be sorted in a
+specific order, which is complicated to describe and difficult to
+implement using ordinary Unix sorting tools. So if you want to
+construct your own data dump from a source of your own that \cw{agedu}
+itself doesn't know how to scan, you will need to make sure it's
+sorted in the right order.
+
+To help with this, \cw{agedu} provides a secondary dump format which
+is \q{sortable}, in the sense that ordinary \cw{sort}(\e{1}) without
+arguments will arrange it into the right order. However, the sortable
+format is much more unreadable and also twice the size, so you
+wouldn't want to write it directly!
+
+So the recommended procedure is to generate dump data in the ordinary
+format; then pipe it through \cw{agedu --presort} to turn it into the
+sortable format; then sort it; \e{then} pipe it into \cw{agedu -L}
+(which can accept either the normal or the sortable format as input).
+For example:
+
+\c generate_custom_data.sh | agedu --presort | sort | agedu -L
+\e iiiiiiiiiiiiiiiiiiiiiii
+
+If you need to transform the sorted dump file back into the ordinary
+format, \cw{agedu --postsort} can do that. But since \cw{agedu -L} can
+accept either format as input, you may not need to.
+
+}
+
 \dt \cw{-h} or \cw{--help}
 
 \dd Causes \cw{agedu} to print some help text and terminate

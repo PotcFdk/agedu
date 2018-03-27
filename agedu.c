@@ -300,6 +300,10 @@ static void text_query(const void *mappedfile, const char *querydir,
     NOVAL(DUMP) SHORT(D) LONG(dump) HELPOPT("dump the index file on stdout") \
     NOVAL(LOAD) SHORT(L) LONG(load) \
 	HELPOPT("load and index a dump file") \
+    NOVAL(PRESORT) LONG(presort) \
+	HELPOPT("prepare a dump file for sorting") \
+    NOVAL(POSTSORT) LONG(postsort) \
+	HELPOPT("unprepare a dump file after sorting") \
     VAL(SCANDUMP) SHORT(S) LONG(scan_dump) \
 	HELPARG("directory") HELPOPT("scan only, generating a dump") \
     VAL(HTML) SHORT(H) LONG(html) \
@@ -490,7 +494,8 @@ int main(int argc, char **argv)
     const struct trie_file *tf, *prevtf;
     char *filename = PNAME ".dat";
     int doing_opts = 1;
-    enum { TEXT, HTML, SCAN, DUMP, SCANDUMP, LOAD, HTTPD, REMOVE };
+    enum { TEXT, HTML, SCAN, DUMP, SCANDUMP, LOAD, PRESORT, POSTSORT,
+           HTTPD, REMOVE };
     struct action {
 	int mode;
 	char *arg;
@@ -703,6 +708,24 @@ int main(int argc, char **argv)
 			actions = sresize(actions, actionsize, struct action);
 		    }
 		    actions[nactions].mode = LOAD;
+		    actions[nactions].arg = NULL;
+		    nactions++;
+		    break;
+		  case OPT_PRESORT:
+		    if (nactions >= actionsize) {
+			actionsize = nactions * 3 / 2 + 16;
+			actions = sresize(actions, actionsize, struct action);
+		    }
+		    actions[nactions].mode = PRESORT;
+		    actions[nactions].arg = NULL;
+		    nactions++;
+		    break;
+		  case OPT_POSTSORT:
+		    if (nactions >= actionsize) {
+			actionsize = nactions * 3 / 2 + 16;
+			actions = sresize(actions, actionsize, struct action);
+		    }
+		    actions[nactions].mode = POSTSORT;
 		    actions[nactions].arg = NULL;
 		    nactions++;
 		    break;
@@ -1033,6 +1056,7 @@ int main(int argc, char **argv)
 
 	    if (mode == SCANDUMP) {
                 writestate.fp = stdout;
+                writestate.sortable = false;
                 writestate.pathsep = pathsep;
                 if (!dump_write_header(&writestate))
                     fatal("standard output: %s", strerror(errno));
@@ -1571,6 +1595,7 @@ int main(int argc, char **argv)
 	    buf = snewn(maxpathlen, char);
 
             writestate.fp = stdout;
+            writestate.sortable = false;
             writestate.pathsep = pathsep;
             if (!dump_write_header(&writestate))
                 fatal("standard output: %s", strerror(errno));
@@ -1625,6 +1650,29 @@ int main(int argc, char **argv)
 			strerror(errno));
 		return 1;
 	    }
+	} else if (mode == PRESORT || mode == POSTSORT) {
+            dumpfile_load_state *dls;
+            dumpfile_write_state dws;
+
+            dls = dumpfile_load_init(stdin);
+            if (!dls)
+                return 1;
+
+            dws.fp = stdout;
+            dws.pathsep = dumpfile_load_get_pathsep(dls);
+            dws.sortable = (mode == PRESORT);
+            if (!dump_write_header(&dws))
+                fatal("standard output: %s", strerror(errno));
+
+            dumpfile_record dr;
+            int retd;
+            while ((retd = dumpfile_load_record(dls, &dr)) != 0) {
+                if (retd < 0)
+                    return 1;
+                if (!dump_write_record(&dws, &dr))
+                    fatal("standard output: %s", strerror(errno));
+            }
+            dumpfile_load_finish(dls);
 	}
     }
 

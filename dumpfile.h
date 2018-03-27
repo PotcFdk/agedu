@@ -15,6 +15,7 @@ char dumpfile_load_get_pathsep(dumpfile_load_state *dls);
 
 typedef struct dumpfile_write_state {
     FILE *fp;
+    bool sortable;
     char pathsep;
 } dumpfile_write_state;
 bool dump_write_header(dumpfile_write_state *ws);

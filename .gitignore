@@ -15,6 +15,7 @@
 /depcomp
 /missing
 /stamp-h1
+/compile
 /autom4te.cache
 /build.log
 /build.out

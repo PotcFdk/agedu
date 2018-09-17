@@ -225,6 +225,15 @@ static void du_recurse(char **path, size_t pathlen, size_t *pathsize,
     qsort(names, nnames, sizeof(*names), str_cmp);
 
     for (i = 0; i < nnames; i++) {
+        /*
+         * readdir(3) has occasionally been known to report two copies
+         * of the identical file name, in cases involving strange file
+         * system implementations or (possibly) race conditions. To
+         * avoid failing an assertion in the trie code, de-duplicate.
+         */
+        if (i+1 < nnames && !strcmp(names[i], names[i+1]))
+            continue;
+
 	size_t newpathlen = pathlen + 1 + strlen(names[i]);
 	if (*pathsize <= newpathlen) {
 	    *pathsize = newpathlen * 3 / 2 + 256;

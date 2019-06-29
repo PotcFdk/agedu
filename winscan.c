@@ -1,6 +1,7 @@
 #include <windows.h>
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 
 #define lenof(x) (sizeof((x))/sizeof(*(x)))
@@ -22,7 +23,7 @@ char *dupstr(const char *s) {
 typedef struct {
     HANDLE hdl;
     WIN32_FIND_DATA fdata;
-    int got_one, eod;
+    bool got_one, eod;
 } dirhandle;
 
 
@@ -34,15 +35,15 @@ int open_dir(char *path, dirhandle *dh)
     if (dh->hdl == INVALID_HANDLE_VALUE) {
 	int err = GetLastError();
 	if (err == ERROR_FILE_NOT_FOUND) {
-	    dh->eod = 1;
-	    dh->got_one = 0;
+	    dh->eod = true;
+	    dh->got_one = false;
 	    return 0;
 	} else {
 	    return -err;
 	}
     } else {
-	dh->eod = 0;
-	dh->got_one = 1;
+	dh->eod = false;
+	dh->got_one = true;
 	return 0;
     }
 }
@@ -54,14 +55,14 @@ const char *read_dir(dirhandle *dh)
 	    return NULL;
 
 	if (FindNextFile(dh->hdl, &dh->fdata)) {
-	    dh->got_one = 1;
+	    dh->got_one = true;
 	} else {
-	    dh->eod = 1;
+	    dh->eod = true;
 	    return NULL;
 	}
     }
 
-    dh->got_one = 0;
+    dh->got_one = false;
     return dh->fdata.cFileName;
 }
 

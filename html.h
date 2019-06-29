@@ -75,14 +75,15 @@ struct html_config {
      * stamps are derived from the limits of the age data stored
      * in the index.
      */
-    int autoage;
+    bool autoage;
     time_t oldest, newest;
 
     /*
      * Specify whether to show individual files as well as
      * directories in the report.
      */
-    int showfiles;
+    bool showfiles;
+
     /*
      * The string appearing in the <title> part of HTML pages, before
      * a colon followed by the path being served. Default is "agedu".
@@ -112,14 +113,14 @@ char *html_format_path(const void *t, const struct html_config *cfg,
  * allocated piece of memory containing the entire HTML document,
  * as an ordinary C zero-terminated string.
  *
- * 'downlink' is TRUE if hyperlinks should be generated for
+ * 'downlink' is true if hyperlinks should be generated for
  * subdirectories. (This can also be disabled by setting cfg->format
  * to NULL, but that also disables the upward hyperlinks to parent
- * directories. Setting cfg->format to non-NULL but downlink to NULL
+ * directories. Setting cfg->format to non-NULL but downlink to false
  * will generate uplinks but no downlinks.)
  */
 char *html_query(const void *t, unsigned long index, 
-		 const struct html_config *cfg, int downlink);
+		 const struct html_config *cfg, bool downlink);
 
 /*
  * Recursively output a dump of lots of HTML files which crosslink

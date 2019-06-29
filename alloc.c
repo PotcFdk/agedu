@@ -49,7 +49,7 @@ char *dupfmt(const char *fmt, ...)
     va_list ap;
     time_t t;
     struct tm tm;
-    int got_time = 0;
+    bool got_time = false;
 
     datebuf[0] = '\0';
     totallen = 0;
@@ -70,7 +70,7 @@ char *dupfmt(const char *fmt, ...)
 			if (!got_time) {
 			    t = time(NULL);
 			    tm = *gmtime(&t);
-			    got_time = 1;
+			    got_time = true;
 			}
 			strftime(datebuf, lenof(datebuf),
 				 "%a, %d %b %Y %H:%M:%S GMT", &tm);

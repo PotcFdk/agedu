@@ -65,7 +65,7 @@ static char *http_error(char *code, char *errmsg, char *extraheader,
 		  code, errmsg, code, errmsg, errtext);
 }
 
-static char *http_success(char *mimetype, int stuff_cr, char *document)
+static char *http_success(char *mimetype, bool stuff_cr, char *document)
 {
     return dupfmt("HTTP/1.1 200 OK\r\n"
 		  "Date: %D\r\n"
@@ -86,11 +86,11 @@ static char *http_success(char *mimetype, int stuff_cr, char *document)
  * socket before closing it.
  */
 char *got_data(struct connctx *ctx, char *data, int length,
-	       int magic_access, const char *auth_string,
+	       bool magic_access, const char *auth_string,
 	       const struct html_config *cfg)
 {
     char *line, *p, *q, *r, *z1, *z2, c1, c2;
-    int auth_correct = 0;
+    bool auth_correct = false;
     unsigned long index;
     char *document, *ret;
 
@@ -251,7 +251,7 @@ char *got_data(struct connctx *ctx, char *data, int length,
 			if (p < q) {
 			    *p++ = '\0';
 			    if (!strcmp(r, auth_string))
-				auth_correct = 1;
+				auth_correct = true;
 			}
 		    }
 		}
@@ -278,9 +278,9 @@ char *got_data(struct connctx *ctx, char *data, int length,
                     /*
                      * This is a canonical path. Return the document.
                      */
-                    document = html_query(ctx->t, index, cfg, 1);
+                    document = html_query(ctx->t, index, cfg, true);
                     if (document) {
-                        ret = http_success("text/html", 1, document);
+                        ret = http_success("text/html", true, document);
                         sfree(document);
                     } else {
                         ret = http_error("404", "Not Found", NULL,
@@ -354,10 +354,10 @@ enum { FD_CLIENT, FD_LISTENER, FD_CONNECTION };
 struct fd {
     int fd;
     int type;
-    int deleted;
+    bool deleted;
     char *wdata;
     int wdatalen, wdatapos;
-    int magic_access;
+    bool magic_access;
     struct connctx *cctx;
 };
 
@@ -380,8 +380,8 @@ struct fd *new_fdstruct(int fd, int type)
     ret->wdata = NULL;
     ret->wdatalen = ret->wdatapos = 0;
     ret->cctx = NULL;
-    ret->deleted = 0;
-    ret->magic_access = 0;
+    ret->deleted = false;
+    ret->magic_access = false;
 
     return ret;
 }
@@ -506,7 +506,7 @@ int check_owning_uid(int fd, int flip)
 void check_magic_access(struct fd *fd)
 {
     if (check_owning_uid(fd->fd, 0) == getuid())
-	fd->magic_access = 1;
+	fd->magic_access = true;
 }
 
 static void base64_encode_atom(unsigned char *data, int n, char *out)
@@ -549,7 +549,7 @@ static int make_listening_sockets(struct listenfds *fds, const char *address,
      */
     struct sockaddr_in6 addr6;
     struct sockaddr_in addr4;
-    int got_v6, got_v4;
+    bool got_v6, got_v4;
     socklen_t addrlen;
     int ret, port = 0;
 
@@ -581,7 +581,8 @@ static int make_listening_sockets(struct listenfds *fds, const char *address,
     }
 
     fds->v6 = fds->v4 = -1;
-    got_v6 = got_v4 = 0;
+    got_v6 = false;
+    got_v4 = false;
 
 #if defined HAVE_GETADDRINFO
 
@@ -607,7 +608,7 @@ static int make_listening_sockets(struct listenfds *fds, const char *address,
             memcpy(&addr6, ai->ai_addr, ai->ai_addrlen);
             if (portstr && !port)
                 port = ntohs(addr6.sin6_port);
-            got_v6 = 1;
+            got_v6 = true;
         }
 #endif
 #ifndef NO_IPV4
@@ -615,7 +616,7 @@ static int make_listening_sockets(struct listenfds *fds, const char *address,
             memcpy(&addr4, ai->ai_addr, ai->ai_addrlen);
             if (portstr && !port)
                 port = ntohs(addr4.sin_port);
-            got_v4 = 1;
+            got_v4 = true;
         }
 #endif
     }
@@ -632,12 +633,12 @@ static int make_listening_sockets(struct listenfds *fds, const char *address,
 
     if (!address) {
         addr4.sin_addr.s_addr = htons(INADDR_ANY);
-        got_v4 = 1;
+        got_v4 = true;
     } else if (inet_aton(address, &addr4.sin_addr)) {
-        got_v4 = 1;                    /* numeric address */
+        got_v4 = true;                 /* numeric address */
     } else if ((h = gethostbyname(address)) != NULL) {
         memcpy(&addr4.sin_addr, h->h_addr, sizeof(addr4.sin_addr));
-        got_v4 = 1;
+        got_v4 = true;
     } else {
         fprintf(stderr, "gethostbyname: %s\n", hstrerror(h_errno));
         return -1;
@@ -1029,7 +1030,7 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
 			 * connection if it does.
 			 */
 			close(fds[i].fd);
-			fds[i].deleted = 1;
+			fds[i].deleted = true;
 			break;
 		    } else {
 			if (!fds[i].wdata) {
@@ -1067,7 +1068,7 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
 			 * Shouldn't happen; abandon the connection.
 			 */
 			close(fds[i].fd);
-			fds[i].deleted = 1;
+			fds[i].deleted = true;
 			break;
 		    } else {
 			fds[i].wdatapos += ret;

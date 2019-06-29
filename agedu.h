@@ -12,6 +12,9 @@
 #ifdef HAVE_STDIO_H
 #  include <stdio.h>
 #endif
+#ifdef HAVE_STDBOOL_H
+#  include <stdbool.h>
+#endif
 #ifdef HAVE_ERRNO_H
 #  include <errno.h>
 #endif

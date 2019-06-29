@@ -19,7 +19,7 @@ AM_CONDITIONAL([HAVE_HALIBUT],[test "x$HALIBUT" = "xyes"])
 AC_HEADER_DIRENT
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS([assert.h arpa/inet.h ctype.h errno.h fcntl.h features.h fnmatch.h limits.h netdb.h netinet/in.h pwd.h stdarg.h stddef.h stdint.h stdio.h stdlib.h string.h sys/ioctl.h sys/mman.h sys/socket.h syslog.h termios.h time.h unistd.h])
+AC_CHECK_HEADERS([assert.h arpa/inet.h ctype.h errno.h fcntl.h features.h fnmatch.h limits.h netdb.h netinet/in.h pwd.h stdarg.h stddef.h stdint.h stdio.h stdbool.h stdlib.h string.h sys/ioctl.h sys/mman.h sys/socket.h syslog.h termios.h time.h unistd.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST

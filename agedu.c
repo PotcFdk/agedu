@@ -34,8 +34,10 @@ void fatal(const char *fmt, ...)
     exit(1);
 }
 
+typedef enum IncludeStatus { PRUNE, EXCLUDE, INCLUDE } IncludeStatus;
+
 struct inclusion_exclusion {
-    int type;
+    IncludeStatus status;
     const char *wildcard;
     int path;
 };
@@ -45,14 +47,15 @@ struct ctx {
     dev_t datafile_dev, filesystem_dev;
     ino_t datafile_ino;
     time_t last_output_update;
-    int progress, progwidth;
-    int straight_to_dump;
+    bool progress;
+    int progwidth;
+    bool straight_to_dump;
     struct inclusion_exclusion *inex;
     int ninex;
-    int crossfs;
-    int usemtime;
-    int uselogicalsize;
-    int fakeatimes;
+    bool crossfs;
+    bool usemtime;
+    bool uselogicalsize;
+    bool fakeatimes;
 };
 
 static dumpfile_write_state writestate;
@@ -71,7 +74,8 @@ static int gotdata(void *vctx, const char *pathname, const STRUCT_STAT *st)
     struct ctx *ctx = (struct ctx *)vctx;
     struct trie_file file;
     time_t t;
-    int i, include;
+    int i;
+    IncludeStatus status;
     const char *filename;
 
     /*
@@ -99,7 +103,7 @@ static int gotdata(void *vctx, const char *pathname, const STRUCT_STAT *st)
     /*
      * Filter based on wildcards.
      */
-    include = 1;
+    status = INCLUDE;
     filename = strrchr(pathname, pathsep);
     if (!filename)
 	filename = pathname;
@@ -108,11 +112,11 @@ static int gotdata(void *vctx, const char *pathname, const STRUCT_STAT *st)
     for (i = 0; i < ctx->ninex; i++) {
 	if (fnmatch(ctx->inex[i].wildcard,
 		    ctx->inex[i].path ? pathname : filename, 0) == 0)
-	    include = ctx->inex[i].type;
+	    status = ctx->inex[i].status;
     }
-    if (include == -1)
+    if (status == PRUNE)
 	return 0;		       /* ignore this entry and any subdirs */
-    if (include == 0) {
+    if (status == EXCLUDE) {
 	/*
 	 * Here we are supposed to be filtering an entry out, but
 	 * still recursing into it if it's a directory. However,
@@ -163,7 +167,7 @@ static void scan_error(void *vctx, const char *fmt, ...)
 }
 
 static void text_query(const void *mappedfile, const char *querydir,
-		       time_t t, int showfiles, int depth, FILE *fp)
+		       time_t t, bool showfiles, int depth, FILE *fp)
 {
     size_t maxpathlen;
     char *pathbuf;
@@ -500,7 +504,7 @@ int main(int argc, char **argv)
     indexbuild *ib;
     const struct trie_file *tf, *prevtf;
     char *filename = PNAME ".dat";
-    int doing_opts = 1;
+    bool doing_opts = true;
     enum { TEXT, HTML, SCAN, DUMP, SCANDUMP, LOAD, PRESORT, POSTSORT,
            HTTPD, REMOVE };
     struct action {
@@ -510,24 +514,25 @@ int main(int argc, char **argv)
     int nactions = 0, actionsize = 0, action;
     time_t now = time(NULL);
     time_t textcutoff = now, htmlnewest = now, htmloldest = now;
-    int htmlautoagerange = 1;
+    bool htmlautoagerange = true;
     const char *httpserveraddr = "localhost";
     const char *httpserverport = NULL;
     const char *httpauthdata = NULL;
     const char *outfile = NULL;
-    int numeric = 0;
+    bool numeric = false;
     const char *html_title = PNAME;
     int auth = HTTPD_AUTH_MAGIC | HTTPD_AUTH_BASIC;
-    int progress = 1;
+    enum { NEVER, IFTTY, ALWAYS } progress = IFTTY;
     struct inclusion_exclusion *inex = NULL;
     int ninex = 0, inexsize = 0;
-    int crossfs = 0;
-    int depth = -1, gotdepth = 0;
-    int fakediratimes = 1;
-    int mtime = 0;
-    int logicalsize = 0;
-    int closeoneof = 1;
-    int showfiles = 0;
+    bool crossfs = false;
+    int depth = -1;
+    bool gotdepth = false;
+    bool fakediratimes = true;
+    bool mtime = false;
+    bool logicalsize = false;
+    bool closeoneof = true;
+    bool showfiles = false;
 
 #ifdef DEBUG_MAD_OPTION_PARSING_MACROS
     {
@@ -548,10 +553,10 @@ int main(int argc, char **argv)
         char *p = *++argv;
 
         if (doing_opts && *p == '-') {
-	    int wordstart = 1;
+	    bool wordstart = true;
 
             if (!strcmp(p, "--")) {
-                doing_opts = 0;
+                doing_opts = false;
 		continue;
             }
 
@@ -572,7 +577,7 @@ int main(int argc, char **argv)
 
 		    for (i = 0; i < NLONGOPTS; i++) {
 			const char *opt = longopts[i], *s = p;
-			int match = 1;
+			bool match = true;
 			/*
 			 * The underscores in the option names
 			 * defined above may be given by the user
@@ -585,7 +590,7 @@ int main(int argc, char **argv)
 				    s++;
 			    } else {
 				if (*opt != *s) {
-				    match = 0;
+				    match = false;
 				    break;
 				}
 				s++;
@@ -657,7 +662,7 @@ int main(int argc, char **argv)
 		    }
 		}
 
-		wordstart = 0;
+		wordstart = false;
 
 		/*
 		 * Now actually process the option.
@@ -776,37 +781,37 @@ int main(int argc, char **argv)
 		    nactions++;
 		    break;
 		  case OPT_PROGRESS:
-		    progress = 2;
+		    progress = ALWAYS;
 		    break;
 		  case OPT_NOPROGRESS:
-		    progress = 0;
+		    progress = NEVER;
 		    break;
 		  case OPT_TTYPROGRESS:
-		    progress = 1;
+		    progress = IFTTY;
 		    break;
 		  case OPT_CROSSFS:
-		    crossfs = 1;
+		    crossfs = true;
 		    break;
 		  case OPT_NOCROSSFS:
-		    crossfs = 0;
+		    crossfs = false;
 		    break;
 		  case OPT_DIRATIME:
-		    fakediratimes = 0;
+		    fakediratimes = false;
 		    break;
 		  case OPT_NODIRATIME:
-		    fakediratimes = 1;
+		    fakediratimes = true;
 		    break;
 		  case OPT_SHOWFILES:
-		    showfiles = 1;
+		    showfiles = true;
 		    break;
 		  case OPT_MTIME:
-		    mtime = 1;
+		    mtime = true;
 		    break;
 		  case OPT_LOGICALSIZE:
-		    logicalsize = 1;
+		    logicalsize = true;
 		    break;
                   case OPT_NOEOF:
-                    closeoneof = 0;
+                    closeoneof = false;
                     break;
 		  case OPT_DATAFILE:
 		    filename = optval;
@@ -821,13 +826,13 @@ int main(int argc, char **argv)
 			depth = -1;
 		    else
 			depth = atoi(optval);
-		    gotdepth = 1;
+		    gotdepth = true;
 		    break;
 		  case OPT_OUTFILE:
 		    outfile = optval;
 		    break;
 		  case OPT_NUMERIC:
-		    numeric = 1;
+		    numeric = true;
 		    break;
                   case OPT_HTMLTITLE:
                     html_title = optval;
@@ -837,14 +842,14 @@ int main(int argc, char **argv)
 		    break;
 		  case OPT_AGERANGE:
 		    if (!strcmp(optval, "auto")) {
-			htmlautoagerange = 1;
+			htmlautoagerange = true;
 		    } else {
 			char *q = optval + strcspn(optval, "-:");
 			if (*q)
 			    *q++ = '\0';
 			htmloldest = parse_age(now, optval);
 			htmlnewest = *q ? parse_age(now, q) : now;
-			htmlautoagerange = 0;
+			htmlautoagerange = false;
 		    }
 		    break;
 		  case OPT_SERVERADDR:
@@ -971,15 +976,17 @@ int main(int argc, char **argv)
 			inex = sresize(inex, inexsize,
 				       struct inclusion_exclusion);
 		    }
-		    inex[ninex].path = (optid == OPT_INCLUDEPATH ||
-					optid == OPT_EXCLUDEPATH ||
-					optid == OPT_PRUNEPATH);
-		    inex[ninex].type = (optid == OPT_INCLUDE ? 1 :
-					optid == OPT_INCLUDEPATH ? 1 :
-					optid == OPT_EXCLUDE ? 0 :
-					optid == OPT_EXCLUDEPATH ? 0 :
-					optid == OPT_PRUNE ? -1 :
-					/* optid == OPT_PRUNEPATH ? */ -1);
+		    inex[ninex].path =
+                        (optid == OPT_INCLUDEPATH ||
+                         optid == OPT_EXCLUDEPATH ||
+                         optid == OPT_PRUNEPATH);
+		    inex[ninex].status =
+                        (optid == OPT_INCLUDE ? INCLUDE :
+                         optid == OPT_INCLUDEPATH ? INCLUDE :
+                         optid == OPT_EXCLUDE ? EXCLUDE :
+                         optid == OPT_EXCLUDEPATH ? EXCLUDE :
+                         optid == OPT_PRUNE ? PRUNE :
+                         /* optid == OPT_PRUNEPATH ? */ PRUNE);
 		    inex[ninex].wildcard = optval;
 		    ninex++;
 		    break;
@@ -1027,11 +1034,11 @@ int main(int argc, char **argv)
 		}
 		ctx->datafile_dev = st.st_dev;
 		ctx->datafile_ino = st.st_ino;
-		ctx->straight_to_dump = 0;
+		ctx->straight_to_dump = false;
 	    } else {
 		ctx->datafile_dev = -1;
 		ctx->datafile_ino = -1;
-		ctx->straight_to_dump = 1;
+		ctx->straight_to_dump = true;
 	    }
 
 	    if (mode == SCAN || mode == SCANDUMP) {
@@ -1052,13 +1059,13 @@ int main(int argc, char **argv)
 
 	    ctx->last_output_update = time(NULL);
 
-	    /* progress==1 means report progress only if stderr is a tty */
-	    if (progress == 1)
-		progress = isatty(2) ? 2 : 0;
-	    ctx->progress = progress;
+	    if (progress == IFTTY)
+		ctx->progress = isatty(2);
+	    else
+                ctx->progress = (progress == ALWAYS);
 	    {
 		struct winsize ws;
-		if (progress &&
+		if (ctx->progress &&
 		    ioctl(2, TIOCGWINSZ, &ws) == 0 &&
 		    ws.ws_col > 0)
 		    ctx->progwidth = ws.ws_col - 1;
@@ -1521,7 +1528,7 @@ int main(int argc, char **argv)
 		/*
 		 * Single output file.
 		 */
-		html = html_query(mappedfile, xi, &cfg, 1);
+		html = html_query(mappedfile, xi, &cfg, true);
 		if (querydir && outfile != NULL) {
 		    FILE *fp = fopen(outfile, "w");
 		    if (!fp) {

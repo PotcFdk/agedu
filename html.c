@@ -249,9 +249,9 @@ static void end_colour_bar(struct html *ctx)
 }
 
 struct vector {
-    int want_href, essential;
+    bool want_href, essential;
     char *name;
-    int literal; /* should the name be formatted in fixed-pitch? */
+    bool literal;   /* should the name be formatted in fixed-pitch? */
     unsigned long index;
     unsigned long long sizes[MAXCOLOUR+1];
 };
@@ -283,8 +283,8 @@ int vec_compare(const void *av, const void *bv)
 }
 
 static struct vector *make_vector(struct html *ctx, char *path,
-				  int want_href, int essential,
-				  char *name, int literal)
+				  bool want_href, bool essential,
+				  char *name, bool literal)
 {
     unsigned long xi1, xi2;
     struct vector *vec = snew(struct vector);
@@ -343,8 +343,8 @@ struct format_option {
     const char *prefix, *suffix;       /* may include '%%' */
     int prefixlen, suffixlen;          /* does not count '%%' */
     char fmttype;                      /* 0 for none, or 'n' or 'p' */
-    int translate_pathsep;             /* pathsep rendered as '/'? */
-    int shorten_path;                  /* omit common prefix? */
+    bool translate_pathsep;            /* pathsep rendered as '/'? */
+    bool shorten_path;                 /* omit common prefix? */
 };
 
 /*
@@ -396,14 +396,15 @@ struct format_option get_format_option(const char **fmt)
      * Interpret formatting directive with flags.
      */
     (*fmt)++;
-    ret.translate_pathsep = ret.shorten_path = 1;
+    ret.translate_pathsep = true;
+    ret.shorten_path = true;
     while (1) {
         char c = *(*fmt)++;
         assert(c);
         if (c == '/') {
-            ret.translate_pathsep = 0;
+            ret.translate_pathsep = false;
         } else if (c == '-') {
-            ret.shorten_path = 0;
+            ret.shorten_path = false;
         } else {
             assert(c == 'n' || c == 'p');
             ret.fmttype = c;
@@ -864,7 +865,7 @@ static void write_report_line(struct html *ctx, struct vector *vec)
      */
     htprintf(ctx, "<td style=\"padding: 0.2em\">");
     if (vec->name) {
-	int doing_href = 0;
+	bool doing_href = false;
 
 	if (ctx->uriformat && vec->want_href) {
 	    char *targeturi = format_string(ctx->uriformat, vec->index,
@@ -873,7 +874,7 @@ static void write_report_line(struct html *ctx, struct vector *vec)
 	    htprintf(ctx, "<a href=\"%s\">", link);
             sfree(link);
             sfree(targeturi);
-	    doing_href = 1;
+	    doing_href = true;
 	}
 	if (vec->literal)
 	    htprintf(ctx, "<code>");
@@ -899,7 +900,7 @@ int strcmptrailingpathsep(const char *a, const char *b)
 }
 
 char *html_query(const void *t, unsigned long index,
-		 const struct html_config *cfg, int downlink)
+		 const struct html_config *cfg, bool downlink)
 {
     struct html actx, *ctx = &actx;
     char *path, *path2, *p, *q;
@@ -1053,7 +1054,7 @@ char *html_query(const void *t, unsigned long index,
     vecsize = 64;
     vecs = snewn(vecsize, struct vector *);
     nvecs = 1;
-    vecs[0] = make_vector(ctx, path, 0, 1, NULL, 0);
+    vecs[0] = make_vector(ctx, path, false, true, NULL, false);
     print_heading(ctx, "Overall");
     write_report_line(ctx, vecs[0]);
 
@@ -1081,8 +1082,8 @@ char *html_query(const void *t, unsigned long index,
 	    vecs = sresize(vecs, vecsize, struct vector *);
 	}
 	assert(strlen(path2) > pathlen);
-	vecs[nvecs] = make_vector(ctx, path2, downlink && (xj2 - xj1 > 1), 0,
-				  path2 + subdirpos, 1);
+	vecs[nvecs] = make_vector(ctx, path2, downlink && (xj2 - xj1 > 1),
+                                  false, path2 + subdirpos, 1);
 	for (i = 0; i <= MAXCOLOUR; i++)
 	    vecs[0]->sizes[i] -= vecs[nvecs]->sizes[i];
 	nvecs++;

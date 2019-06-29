@@ -42,8 +42,8 @@ char *dupstr(const char *s);
  *    (again, no fine-tuning available)
  *  - %h takes a const char * but escapes it so that it's safe for
  *    HTML
- *  - %S takes an int followed by a const char *. If the int is
- *    zero, it behaves just like %s. If the int is nonzero, it
+ *  - %S takes a bool followed by a const char *. If the bool is
+ *    false, it behaves just like %s. If the bool is true, it
  *    transforms the string by stuffing a \r before every \n.
  */
 char *dupfmt(const char *fmt, ...);

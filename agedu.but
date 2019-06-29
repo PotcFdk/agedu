@@ -591,6 +591,33 @@ be a convenient way to locate the culprit.
 
 }
 
+\dt \cw{--logicalsize}
+
+\dd This option causes \cw{agedu} to consider the size of each file to
+be its \q{logical} size, rather than the amount of space it consumes
+on disk. (That is, it will use \c{st_size} instead of \c{st_blocks} in
+the data returned from \cw{stat}(\e{2}).) This option makes \cw{agedu}
+less accurate at reporting how much of your disk is used, but it might
+be useful in specialist cases, such as working around a file system
+that is misreporting physical sizes.
+
+\lcont{
+
+For most files, the physical size of a file will be larger than the
+logical size, reflecting the fact that filesystem layouts generally
+allocate a whole number of blocks of the disk to each file, so some
+space is wasted at the end of the last block. So counting only the
+logical file size will typically cause under-reporting of the disk
+usage (perhaps \e{large} under-reporting in the case of a very large
+number of very small files).
+
+On the other hand, sometimes a file with a very large logical size can
+have \q{holes} where no data is actually stored, in which case using
+the logical size of the file will \e{over}-report its disk usage. So
+the use of logical sizes can give wrong answers in both directions.
+
+}
+
 The following option affects all the modes that generate reports:
 the web server mode \cw{-w}, the stand-alone HTML generation mode
 \cw{-H} and the text report mode \cw{-t}.

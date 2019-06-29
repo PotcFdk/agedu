@@ -51,6 +51,7 @@ struct ctx {
     int ninex;
     int crossfs;
     int usemtime;
+    int uselogicalsize;
     int fakeatimes;
 };
 
@@ -85,7 +86,11 @@ static int gotdata(void *vctx, const char *pathname, const STRUCT_STAT *st)
     if (!ctx->crossfs && st->st_dev != ctx->filesystem_dev)
 	return 0;
 
-    file.size = (unsigned long long)512 * st->st_blocks;
+    if (ctx->uselogicalsize)
+        file.size = st->st_size;
+    else
+        file.size = (unsigned long long)512 * st->st_blocks;
+
     if (ctx->usemtime || (ctx->fakeatimes && S_ISDIR(st->st_mode)))
 	file.atime = st->st_mtime;
     else
@@ -344,6 +349,8 @@ static void text_query(const void *mappedfile, const char *querydir,
         HELPOPT("[--web] do not close web server on EOF") \
     NOVAL(MTIME) LONG(mtime) \
         HELPOPT("[--scan] use mtime instead of atime") \
+    NOVAL(LOGICALSIZE) LONG(logicalsize) \
+        HELPOPT("[--logicalsize] use logical instead of physical file size") \
     NOVAL(SHOWFILES) LONG(files) \
         HELPOPT("[--web,--html,--text] list individual files") \
     VAL(AGERANGE) SHORT(r) LONG(age_range) LONG(range) LONG(ages) \
@@ -518,6 +525,7 @@ int main(int argc, char **argv)
     int depth = -1, gotdepth = 0;
     int fakediratimes = 1;
     int mtime = 0;
+    int logicalsize = 0;
     int closeoneof = 1;
     int showfiles = 0;
 
@@ -794,6 +802,9 @@ int main(int argc, char **argv)
 		  case OPT_MTIME:
 		    mtime = 1;
 		    break;
+		  case OPT_LOGICALSIZE:
+		    logicalsize = 1;
+		    break;
                   case OPT_NOEOF:
                     closeoneof = 0;
                     break;
@@ -1037,6 +1048,7 @@ int main(int argc, char **argv)
 	    ctx->crossfs = crossfs;
 	    ctx->fakeatimes = fakediratimes;
 	    ctx->usemtime = mtime;
+	    ctx->uselogicalsize = logicalsize;
 
 	    ctx->last_output_update = time(NULL);
 

@@ -1064,7 +1064,18 @@ char *html_query(const void *t, unsigned long index,
      */
     print_heading(ctx, "Subdirectories");
 
-    vecs[0]->name = dupstr("[files]");
+    if (cfg->showfiles) {
+        /* Every file directly in this directory is going to end up in
+         * its own entry in the loop below, and then it'll be
+         * subtracted from vecs[0]. So vecs[0] will end up tracking
+         * the size of the _directory inode_ only. */
+        vecs[0]->name = dupstr("[directory]");
+    } else {
+        /* Otherwise, vecs[0] will track everything that wasn't part
+         * of a subdirectory, which includes the directory inode but
+         * also all the files within it. Use this more general name. */
+        vecs[0]->name = dupstr("[files]");
+    }
     get_indices(t, path, &xi1, &xi2);
     xi1++;
     pathlen = strlen(path);

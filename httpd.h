@@ -11,6 +11,7 @@ struct httpd_config {
     const char *address, *port;
     bool closeoneof;
     const char *basicauthdata;
+    const char *url_launch_command;
 };
 
 void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,

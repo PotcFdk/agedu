@@ -814,6 +814,23 @@ the index file. You might use this option if you were serving
 \cw{agedu} reports for several different servers and wanted to make it
 clearer which one a user was looking at.
 
+\dt \cw{--launch} \e{shell-command}
+
+\dd Specify a command to be run with the base URL of the web user
+interface, once the web server has started up. The command will be
+interpreted by \cw{/bin/sh}, and the base URL will be appended to it
+as an extra argument word.
+
+\lcont{
+
+A typical use for this would be \cq{--launch=browse}, which uses the
+XDG \cq{browse} command to automatically open the \cw{agedu} web
+interface in your default browser. However, other uses are possible:
+for example, you could provide a command which communicates the URL to
+some other software that will use it for something.
+
+}
+
 \dt \cw{--no-eof}
 
 \dd Stop \cw{agedu} in web server mode from looking for end-of-file on

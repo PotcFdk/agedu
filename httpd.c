@@ -885,13 +885,57 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
     } else {
         openbracket = closebracket = "";
     }
+    char *url;
     if (port == 80) {
-	printf("URL: http://%s%s%s/\n", openbracket, hostname, closebracket);
+	url = dupfmt("http://%s%s%s/", openbracket, hostname, closebracket);
     } else {
-	printf("URL: http://%s%s%s:%d/\n", openbracket, hostname, closebracket,
-               port);
+	url = dupfmt("http://%s%s%s:%d/", openbracket, hostname, closebracket,
+                     port);
     }
+    printf("URL: %s\n", url);
     fflush(stdout);
+
+    if (dcfg->url_launch_command) {
+        pid_t pid = fork();
+        if (pid < 0) {
+            fprintf(stderr, "Unable to fork for launch command: %s\n",
+                    strerror(errno));
+        } else if (pid == 0) {
+            char *args[5];
+            args[0] = dupstr("sh");
+            args[1] = dupstr("-c");
+            args[2] = dupfmt("%s \"$0\"", dcfg->url_launch_command);
+            args[3] = dupstr(url);
+            args[4] = NULL;
+            execvp("/bin/sh", args);
+            _exit(127);
+        } else {
+            int status;
+            if (waitpid(pid, &status, 0) < 0) {
+                fprintf(stderr, "Unable to wait for launch command: %s\n",
+                        strerror(errno));
+            } else if (WIFSIGNALED(status)) {
+                int sig = WTERMSIG(status);
+                fprintf(stderr, "Launch command terminated with signal "
+                        "%d%s%s%s\n", sig,
+#if HAVE_STRSIGNAL
+                        " (", strsignal(sig), ")"
+#else
+                        "", "", ""
+#endif
+                    );
+            } else {
+                int exitcode = WEXITSTATUS(status);
+                if (exitcode) {
+                    fprintf(stderr,
+                            "Launch command terminated with status %d\n",
+                            exitcode);
+                }
+            }
+        }
+    }
+
+    sfree(url);
 
     /*
      * Now construct fd structure(s) to hold the listening sockets.

@@ -41,7 +41,7 @@ AC_SEARCH_LIBS(inet_addr, socket nsl)
 AC_SEARCH_LIBS(gethostbyname, socket nsl resolv)
 AC_SEARCH_LIBS(getaddrinfo, socket nsl resolv)
 
-AC_CHECK_FUNCS([ftruncate fdopendir lstat64 stat64 memchr munmap select socket strcasecmp strchr strcspn strerror strrchr strspn strtoul strtoull connect inet_ntoa inet_addr gethostbyname getaddrinfo])
+AC_CHECK_FUNCS([ftruncate fdopendir lstat64 stat64 memchr munmap select socket strcasecmp strchr strcspn strerror strrchr strspn strtoul strtoull connect inet_ntoa inet_addr gethostbyname getaddrinfo strsignal])
 
 AC_ARG_ENABLE([ipv6],
               AS_HELP_STRING([--disable-ipv6],

@@ -349,6 +349,8 @@ static void text_query(const void *mappedfile, const char *querydir,
         HELPOPT("[--scan,--load] keep real atimes on directories") \
     NOVAL(NODIRATIME) LONG(no_dir_atime) LONG(no_dir_atimes) \
         HELPOPT("[--scan,--load] fake atimes on directories") \
+    VAL(LAUNCH) LONG(launch) \
+        HELPOPT("[--web] run this command with the URL on startup") \
     NOVAL(NOEOF) LONG(no_eof) LONG(noeof) \
         HELPOPT("[--web] do not close web server on EOF") \
     NOVAL(MTIME) LONG(mtime) \
@@ -519,6 +521,7 @@ int main(int argc, char **argv)
     const char *httpserverport = NULL;
     const char *httpauthdata = NULL;
     const char *outfile = NULL;
+    const char *url_launch_command = NULL;
     bool numeric = false;
     const char *html_title = PNAME;
     int auth = HTTPD_AUTH_MAGIC | HTTPD_AUTH_BASIC;
@@ -810,6 +813,9 @@ int main(int argc, char **argv)
 		  case OPT_LOGICALSIZE:
 		    logicalsize = true;
 		    break;
+                  case OPT_LAUNCH:
+                    url_launch_command = optval;
+                    break;
                   case OPT_NOEOF:
                     closeoneof = false;
                     break;
@@ -1655,6 +1661,7 @@ int main(int argc, char **argv)
 	    dcfg.port = httpserverport;
 	    dcfg.closeoneof = closeoneof;
 	    dcfg.basicauthdata = httpauthdata;
+	    dcfg.url_launch_command = url_launch_command;
 	    pcfg.uriformat = "/%|/%p/%|%|/%p";
 	    pcfg.autoage = htmlautoagerange;
 	    pcfg.oldest = htmloldest;

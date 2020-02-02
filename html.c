@@ -1103,7 +1103,8 @@ char *html_query(const void *t, unsigned long index,
     qsort(vecs, nvecs, sizeof(vecs[0]), vec_compare);
 
     for (i = 0; i < nvecs; i++)
-	write_report_line(ctx, vecs[i]);
+        if (vecs[i]->sizes[MAXCOLOUR])
+            write_report_line(ctx, vecs[i]);
 
     /*
      * Close the main table.

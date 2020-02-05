@@ -350,7 +350,7 @@ static void text_query(const void *mappedfile, const char *querydir,
     NOVAL(NODIRATIME) LONG(no_dir_atime) LONG(no_dir_atimes) \
         HELPOPT("[--scan,--load] fake atimes on directories") \
     VAL(LAUNCH) LONG(launch) \
-        HELPOPT("[--web] run this command with the URL on startup") \
+        HELPARG("shell-cmd") HELPOPT("[--web] pass the base URL to the given command") \
     NOVAL(NOEOF) LONG(no_eof) LONG(noeof) \
         HELPOPT("[--web] do not close web server on EOF") \
     NOVAL(MTIME) LONG(mtime) \

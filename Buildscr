@@ -18,9 +18,13 @@ in agedu do perl -e 'print "\n\\versionid agedu version $$ARGV[0]\n"' $(Version)
 # of this in a throwaway copy of the build directory) to avoid
 # accidentally shipping any outputs of configure. Instead we return
 # only the actual man page from the delegation environment.
+#
+# While we're in there, we also ensure agedu builds, and runs its help.
 delegate -
   in agedu do ./configure
   in agedu do make doc
+  in agedu do make -j$(nproc)
+  in agedu do ./agedu --help
   return agedu/*.1
 enddelegate
 

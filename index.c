@@ -347,7 +347,22 @@ unsigned long long index_order_stat(const void *t, double f)
     node = NODE(t, roots[count-1]);
 
     size = node->totalsize * f;
-    assert(size <= node->totalsize);
+    if (size > node->totalsize) {
+        /*
+         * This can happen in principle if node->totalsize is so
+         * enormous (bigger than 2^53 bytes) that it can't be
+         * represented faithfully in a 'double'. Then it might be
+         * rounded _up_ by the conversion to double, and if
+         * multiplication by f doesn't make it smaller again, end up
+         * just bigger than node->totalsize by the time we convert
+         * back to an integer.
+         *
+         * It takes a huge filesystem to make that happen in reality -
+         * but a corrupt index file could also trip the same case, so
+         * we should at least handle it gracefully.
+         */
+        size = node->totalsize;
+    }
 
     while (1) {
 	const struct trie_file *tf = ELEMENT(t, node->element);

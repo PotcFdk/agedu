@@ -79,6 +79,14 @@ static int str_cmp(const void *av, const void *bv)
 typedef int (*gotdata_fn_t)(void *ctx, const char *pathname,
 			    WIN32_FIND_DATA *dat);
 
+static void format_error(char *buf, size_t size, int err)
+{
+    FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, err, 0, buf, size, NULL);
+    buf[size-1] = '\0';
+    if (buf[strlen(buf)-1] == '\n')
+        buf[strlen(buf)-1] = '\0';
+}
+
 static void du_recurse(char **path, size_t pathlen, size_t *pathsize,
 		       gotdata_fn_t gotdata, void *gotdata_ctx)
 {
@@ -124,11 +132,7 @@ static void du_recurse(char **path, size_t pathlen, size_t *pathsize,
 
     if ((error = open_dir(*path, &d)) < 0) {
         char buf[4096];
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, -error, 0,
-                      buf, lenof(buf), NULL);
-        buf[lenof(buf)-1] = '\0';
-        if (buf[strlen(buf)-1] == '\n')
-            buf[strlen(buf)-1] = '\0';
+        format_error(buf, lenof(buf), -error);
 	fprintf(stderr, "Unable to open directory '%s': %s\n", *path, buf);
 	return;
     }

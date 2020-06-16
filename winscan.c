@@ -105,8 +105,15 @@ static void du_recurse(char **path, size_t pathlen, size_t *pathsize,
 
     h = FindFirstFile(*path, &dat);
     if (h != INVALID_HANDLE_VALUE) {
+        /* The normal case: we retrieved information about the file in
+         * 'dat', and we also got a handle we can pass to
+         * FindNextFile. We don't need the latter, so close it
+         * immediately. */
 	CloseHandle(h);
     } else if (pathlen > 0 && (*path)[pathlen-1] == '\\') {
+        /* Special case: we're scanning a subdirectory such as c:\ .
+         * In that case, take it to have zero size, and resort to
+         * GetFileTime to find its times. */
 	dat.nFileSizeHigh = dat.nFileSizeLow = 0;
 	dat.ftLastWriteTime.dwHighDateTime = 0x19DB1DE;
 	dat.ftLastWriteTime.dwLowDateTime = 0xD53E8000;
@@ -119,6 +126,13 @@ static void du_recurse(char **path, size_t pathlen, size_t *pathsize,
 			&dat.ftLastWriteTime);
 	    CloseHandle(h);
 	}
+    } else {
+        /* Total failure: FindFirstFile returned INVALID_HANDLE_VALUE
+         * and it _wasn't_ because the file is a special directory. */
+        char buf[4096];
+        format_error(buf, lenof(buf), GetLastError());
+	fprintf(stderr, "Unable to scan '%s': %s\n", *path, buf);
+        return;
     }
 
     if (!gotdata(gotdata_ctx, *path, &dat))

@@ -229,7 +229,7 @@ int gd(void *ctx, const char *pathname, WIN32_FIND_DATA *dat)
      * That's 369 years, of which 92 were divisible by 4, but
      * three of those were century points.
      */
-    t -= (369 * 365 + 92 - 3) * 86400;
+    t -= (369 * 365 + 92 - 3) * (unsigned long long)86400;
     printf("%llu ", t);
 
     for (p = pathname; *p; p++) {

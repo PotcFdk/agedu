@@ -6,18 +6,18 @@
 #include "du.h"
 #include "alloc.h"
 
-#if !defined __linux__ || !defined O_NOATIME || defined HAVE_FDOPENDIR
+#if !defined __linux__ || !defined O_NOATIME || HAVE_FDOPENDIR
 
-#ifdef HAVE_DIRENT_H
+#if HAVE_DIRENT_H
 #  include <dirent.h>
 #endif
-#ifdef HAVE_NDIR_H
+#if HAVE_NDIR_H
 #  include <ndir.h>
 #endif
-#ifdef HAVE_SYS_DIR_H
+#if HAVE_SYS_DIR_H
 #  include <sys/dir.h>
 #endif
-#ifdef HAVE_SYS_NDIR_H
+#if HAVE_SYS_NDIR_H
 #  include <sys/ndir.h>
 #endif
 
@@ -31,7 +31,7 @@ typedef DIR *dirhandle;
 
 int open_dir(const char *path, dirhandle *dh)
 {
-#if defined O_NOATIME && defined HAVE_FDOPENDIR
+#if defined O_NOATIME && HAVE_FDOPENDIR
 
     /*
      * On Linux, we have the O_NOATIME flag. This means we can
@@ -93,7 +93,7 @@ void close_dir(dirhandle *dh)
     closedir(*dh);
 }
 
-#else /* defined __linux__ && !defined HAVE_FDOPENDIR */
+#else /* defined __linux__ && defined O_NOATIME && !HAVE_FDOPENDIR */
 
 /*
  * Earlier versions of glibc do not have fdopendir(). Therefore,
@@ -162,7 +162,7 @@ void close_dir(dirhandle *dh)
     close(dh->fd);
 }
 
-#endif /* !defined __linux__ || defined HAVE_FDOPENDIR */
+#endif /* !defined __linux__ || !defined O_NOATIME || HAVE_FDOPENDIR */
 
 static int str_cmp(const void *av, const void *bv)
 {

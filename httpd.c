@@ -417,7 +417,7 @@ int check_owning_uid(int fd, int flip)
 	peer = tmp;
     }
 
-#ifndef NO_IPV4
+#ifdef AGEDU_IPV4
     if (peer.ss_family == AF_INET) {
         struct sockaddr_in *sock4 = (struct sockaddr_in *)&sock;
         struct sockaddr_in *peer4 = (struct sockaddr_in *)&peer;
@@ -430,7 +430,7 @@ int check_owning_uid(int fd, int flip)
         filename = "/proc/net/tcp";
     } else
 #endif
-#ifndef NO_IPV6
+#ifdef AGEDU_IPV6
     if (peer.ss_family == AF_INET6) {
         struct sockaddr_in6 *sock6 = (struct sockaddr_in6 *)&sock;
         struct sockaddr_in6 *peer6 = (struct sockaddr_in6 *)&peer;
@@ -584,7 +584,7 @@ static int make_listening_sockets(struct listenfds *fds, const char *address,
     got_v6 = false;
     got_v4 = false;
 
-#if defined HAVE_GETADDRINFO
+#if HAVE_GETADDRINFO
 
     /*
      * Resolve the given address using getaddrinfo, yielding an IPv6
@@ -603,7 +603,7 @@ static int make_listening_sockets(struct listenfds *fds, const char *address,
         return -1;
     }
     for (ai = addrs; ai; ai = ai->ai_next) {
-#ifndef NO_IPV6
+#ifdef AGEDU_IPV6
         if (!got_v6 && ai->ai_family == AF_INET6) {
             memcpy(&addr6, ai->ai_addr, ai->ai_addrlen);
             if (portstr && !port)
@@ -611,7 +611,7 @@ static int make_listening_sockets(struct listenfds *fds, const char *address,
             got_v6 = true;
         }
 #endif
-#ifndef NO_IPV4
+#ifdef AGEDU_IPV4
         if (!got_v4 && ai->ai_family == AF_INET) {
             memcpy(&addr4, ai->ai_addr, ai->ai_addrlen);
             if (portstr && !port)
@@ -621,7 +621,7 @@ static int make_listening_sockets(struct listenfds *fds, const char *address,
 #endif
     }
 
-#elif defined HAVE_GETHOSTBYNAME
+#elif HAVE_GETHOSTBYNAME
 
     /*
      * IPv4-only setup using inet_addr and gethostbyname.
@@ -659,8 +659,8 @@ static int make_listening_sockets(struct listenfds *fds, const char *address,
 
 #endif
 
-#ifndef NO_IPV6
-#ifndef NO_IPV4
+#ifdef AGEDU_IPV6
+#ifdef AGEDU_IPV4
   retry:
 #endif
     if (got_v6) {
@@ -711,7 +711,7 @@ static int make_listening_sockets(struct listenfds *fds, const char *address,
   done_v6:
 #endif
 
-#ifndef NO_IPV4
+#ifdef AGEDU_IPV4
     if (got_v4) {
         fds->v4 = socket(PF_INET, SOCK_STREAM, 0);
         if (fds->v4 < 0) {
@@ -721,7 +721,7 @@ static int make_listening_sockets(struct listenfds *fds, const char *address,
         addr4.sin_port = htons(port);
         addrlen = sizeof(addr4);
         if (bind(fds->v4, (const struct sockaddr *)&addr4, addrlen) < 0) {
-#ifndef NO_IPV6
+#ifdef AGEDU_IPV6
             if (fds->v6 >= 0) {
                 /*
                  * If we support both v6 and v4, it's a failure
@@ -960,7 +960,7 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
     while (1) {
 	fd_set rfds, wfds;
 	int i, j;
-	SELECT_TYPE_ARG1 maxfd;
+	int maxfd;
 	int ret;
 
 #define FD_SET_MAX(fd, set, max) \
@@ -1012,9 +1012,7 @@ void run_httpd(const void *t, int authmask, const struct httpd_config *dcfg,
 	}
 	nfds = i;
 
-        ret = select(maxfd, SELECT_TYPE_ARG234 &rfds,
-		     SELECT_TYPE_ARG234 &wfds, SELECT_TYPE_ARG234 NULL,
-		     SELECT_TYPE_ARG5 NULL);
+        ret = select(maxfd, &rfds, &wfds, NULL, NULL);
 	if (ret <= 0) {
 	    if (ret < 0 && (errno != EINTR)) {
 		fprintf(stderr, "select: %s", strerror(errno));

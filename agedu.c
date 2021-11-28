@@ -12,6 +12,7 @@
 #include "httpd.h"
 #include "fgetline.h"
 #include "dumpfile.h"
+#include "version.h"
 
 /*
  * Path separator. This global variable affects the behaviour of
@@ -675,11 +676,10 @@ int main(int argc, char **argv)
 		    usage(stdout);
 		    return 0;
 		  case OPT_VERSION:
-#ifdef PACKAGE_VERSION
-		    printf("%s, revision %s\n", PNAME, PACKAGE_VERSION);
+#ifdef AGEDU_VERSION
+		    printf("%s, revision %s\n", PNAME, AGEDU_VERSION);
 #else
-		    printf("%s: version number not available when not built"
-			   " via automake\n", PNAME);
+		    printf("%s: version number not available\n", PNAME);
 #endif
 		    return 0;
 		  case OPT_LICENCE:

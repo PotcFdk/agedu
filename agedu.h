@@ -2,96 +2,96 @@
  * Central header file for agedu, defining various useful things.
  */
 
-#include "config.h"
+#include "cmake.h"
 
-#ifdef HAVE_FEATURES_H
+#if HAVE_FEATURES_H
 #define _GNU_SOURCE
 #include <features.h>
 #endif
 
-#ifdef HAVE_STDIO_H
+#if HAVE_STDIO_H
 #  include <stdio.h>
 #endif
-#ifdef HAVE_STDBOOL_H
+#if HAVE_STDBOOL_H
 #  include <stdbool.h>
 #endif
-#ifdef HAVE_ERRNO_H
+#if HAVE_ERRNO_H
 #  include <errno.h>
 #endif
-#ifdef HAVE_TIME_H
+#if HAVE_TIME_H
 #  include <time.h>
 #endif
-#ifdef HAVE_ASSERT_H
+#if HAVE_ASSERT_H
 #  include <assert.h>
 #endif
-#ifdef HAVE_STRING_H
+#if HAVE_STRING_H
 #  include <string.h>
 #endif
-#ifdef HAVE_STDLIB_H
+#if HAVE_STDLIB_H
 #  include <stdlib.h>
 #endif
-#ifdef HAVE_STDARG_H
+#if HAVE_STDARG_H
 #  include <stdarg.h>
 #endif
-#ifdef HAVE_STDINT_H
+#if HAVE_STDINT_H
 #  include <stdint.h>
 #endif
-#ifdef HAVE_STDDEF_H
+#if HAVE_STDDEF_H
 #  include <stddef.h>
 #endif
-#ifdef HAVE_LIMITS_H
+#if HAVE_LIMITS_H
 #  include <limits.h>
 #endif
-#ifdef HAVE_CTYPE_H
+#if HAVE_CTYPE_H
 #  include <ctype.h>
 #endif
 
-#ifdef HAVE_SYS_TYPES_H
+#if HAVE_SYS_TYPES_H
 #  include <sys/types.h>
 #endif
-#ifdef HAVE_SYS_STAT_H
+#if HAVE_SYS_STAT_H
 #  include <sys/stat.h>
 #endif
-#ifdef HAVE_UNISTD_H
+#if HAVE_UNISTD_H
 #  include <unistd.h>
 #endif
-#ifdef HAVE_FCNTL_H
+#if HAVE_FCNTL_H
 #  include <fcntl.h>
 #endif
-#ifdef HAVE_SYS_MMAN_H
+#if HAVE_SYS_MMAN_H
 #  include <sys/mman.h>
 #endif
-#ifdef HAVE_TERMIOS_H
+#if HAVE_TERMIOS_H
 #  include <termios.h>
 #endif
-#ifdef HAVE_SYS_IOCTL_H
+#if HAVE_SYS_IOCTL_H
 #  include <sys/ioctl.h>
 #endif
-#ifdef HAVE_FNMATCH_H
+#if HAVE_FNMATCH_H
 #  include <fnmatch.h>
 #endif
-#ifdef HAVE_PWD_H
+#if HAVE_PWD_H
 #  include <pwd.h>
 #endif
-#ifdef HAVE_SYS_WAIT_H
+#if HAVE_SYS_WAIT_H
 #  include <sys/wait.h>
 #endif
-#ifdef HAVE_SYS_SOCKET_H
+#if HAVE_SYS_SOCKET_H
 #  include <sys/socket.h>
 #endif
-#ifdef HAVE_ARPA_INET_H
+#if HAVE_ARPA_INET_H
 #  include <arpa/inet.h>
 #endif
-#ifdef HAVE_NETINET_IN_H
+#if HAVE_NETINET_IN_H
 #  include <netinet/in.h>
 #endif
-#ifdef HAVE_SYSLOG_H
+#if HAVE_SYSLOG_H
 #  include <syslog.h>
 #endif
-#ifdef HAVE_SYS_SELECT_H
+#if HAVE_SYS_SELECT_H
 #  include <sys/select.h>
 #endif
-#ifdef HAVE_NETDB_H
+#if HAVE_NETDB_H
 #  include <netdb.h>
 #endif
     
@@ -107,7 +107,7 @@
 
 extern char pathsep;
 
-#if defined HAVE_LSTAT64 && HAVE_STAT64
+#if HAVE_LSTAT64 && HAVE_STAT64
 #define STRUCT_STAT struct stat64
 #define LSTAT_FUNC lstat64
 #define STAT_FUNC stat64

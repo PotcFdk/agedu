@@ -6,29 +6,19 @@ module agedu
 
 set Version $(!builddate).$(vcsid)
 
-in agedu do sed '/AC_INIT/s/6.66/$(Version)/' configure.ac > tmp.ac
-in agedu do mv tmp.ac configure.ac
-in agedu do ./mkauto.sh
-
 # use perl to avoid inconsistent behaviour of echo '\v'
+in agedu do perl -e 'print "$#define AGEDU_VERSION \"$$ARGV[0]\"\n"' $(Version) >> version.h
 in agedu do perl -e 'print "\n\\versionid agedu version $$ARGV[0]\n"' $(Version) >> agedu.but
 
-# Build the man page. This also tests the automake setup to ensure
-# configure actually works; but we use a self-delegation (i.e. do all
-# of this in a throwaway copy of the build directory) to avoid
-# accidentally shipping any outputs of configure. Instead we return
-# only the actual man page from the delegation environment.
-#
-# While we're in there, we also ensure agedu builds, and runs its help.
-delegate -
-  in agedu do ./configure
-  in agedu do make doc
-  in agedu do make -j$(nproc)
-  in agedu do ./agedu --help
-  return agedu/*.1
-enddelegate
+# Build the man page. While we're in there, we also ensure agedu
+# builds, and runs its help.
+in . do mkdir docbuild
+in docbuild do cmake ../agedu
+in docbuild do make -j$(nproc) VERBOSE=1
+in docbuild do ./agedu --help
 
 in . do cp -R agedu agedu-$(Version)
+in . do cp -R docbuild/agedu.1 agedu-$(Version)
 in . do tar chzvf agedu-$(Version).tar.gz agedu-$(Version)
 
 in agedu do halibut --html=manpage.html agedu.but
@@ -38,19 +28,13 @@ deliver agedu-$(Version).tar.gz $@
 deliver agedu/manpage.html $@
 deliver agedu/tree.html $@
 
-ifneq "$(VISUAL_STUDIO)" "yes" then
-  in agedu with clangcl64 do clang-cl /c winscan.c && lld-link /out:winscan.exe winscan.obj
-  # Code-sign this Windows binary, if the local bob config provides a
-  # script to do so. We assume here that the script accepts an -i
-  # option to provide a 'more info' URL, and that it signs the file in
-  # place.
-  ifneq "$(cross_winsigncode)" "" in agedu do $(cross_winsigncode) -i https://www.chiark.greenend.org.uk/~sgtatham/agedu/ winscan.exe
-else
-  delegate windows
-    in agedu with visualstudio do/win cl winscan.c
-    ifneq "$(winsigncode)" "" in agedu do $(winsigncode) -i https://www.chiark.greenend.org.uk/~sgtatham/agedu/ winscan.exe
-    return agedu/winscan.exe
-  enddelegate
-endif
+in . do mkdir winbuild
+in winbuild do cmake ../agedu -DCMAKE_TOOLCHAIN_FILE=$(cmake_toolchain_clangcl64) -DCMAKE_BUILD_TYPE=Release -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DCMAKE_C_FLAGS_RELEASE="/MT /O2"
+in winbuild do make -j$(nproc) VERBOSE=1
+# Code-sign this Windows binary, if the local bob config provides a
+# script to do so. We assume here that the script accepts an -i
+# option to provide a 'more info' URL, and that it signs the file in
+# place.
+ifneq "$(cross_winsigncode)" "" in winbuild do $(cross_winsigncode) -i https://www.chiark.greenend.org.uk/~sgtatham/agedu/ ageduscan.exe
 
-deliver agedu/winscan.exe ageduscan.exe
+deliver winbuild/ageduscan.exe $@

@@ -131,6 +131,8 @@ static unsigned long long round_and_format_age(struct html *ctx,
 	sprintf(newbuf, "%d year%s", i, i==1 ? "" : "s");
 	if (newret < age)
 	    goto finish;
+	if (newret > ret)              /* integer overflow - give up! */
+	    goto finish;
 	strcpy(buf, newbuf);
 	ret = newret;
     }
